@@ -12,11 +12,7 @@ class MultipleReflections(us.BaseMethod):
         self.blur_sigma = blur_sigma
         self.apply_blur = apply_blur
 
-    @staticmethod
-    def _blur(image, kernel, sigma):
-        blur_image = cv2.GaussianBlur(image * 255, (kernel, kernel), sigma)
-        blur_image = blur_image / np.max(blur_image)
-        return blur_image
+
 
     @staticmethod
     def _find_centroid(labelmap):
@@ -77,10 +73,12 @@ class MultipleReflections(us.BaseMethod):
         plt.show()
 
 
-root = "C:\\Users\\maria\\OneDrive\\Desktop\\us_augmentation"
+if __name__ == '__main__':
 
-img = cv2.imread(os.path.join(root, "test.png"), cv2.IMREAD_GRAYSCALE)
-gt = cv2.imread(os.path.join(root, "test_label.png"), cv2.IMREAD_GRAYSCALE)
+    root = "C:\\Users\\maria\\OneDrive\\Desktop\\us_augmentation"
 
-method = MultipleReflections(apply_blur=True)
-method.execute(img, gt)
+    img = cv2.imread(os.path.join(root, "test.png"), cv2.IMREAD_GRAYSCALE)
+    gt = cv2.imread(os.path.join(root, "test_label.png"), cv2.IMREAD_GRAYSCALE)
+
+    method = MultipleReflections(apply_blur=True)
+    method.execute(img, gt)

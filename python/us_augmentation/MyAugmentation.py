@@ -5,7 +5,7 @@ class MyAugmentation(us.BaseMethod):
     def __init__(self):
         super(MyAugmentation, self).__init__()
 
-    def execute(self, image):
+    def execute(self, image, label):
         # TODO: do something
 
         return 1
