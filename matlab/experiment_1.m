@@ -55,7 +55,8 @@ IQb_est = bmode2IQb(bmode_image, DR, real_max);
 IQ_estimated_no_augm = IQb2IQ(IQb_est, Mdas);
 IQ_reshaped = reshape(IQ_estimated_no_augm, size_iq);
 
-%% 3b. Plot the result
+%% 3b. Experiment 1.1: Plot the estimated and expected IQ data
+
 fig = figure(1);
 
 subplot(1, 2, 1)
@@ -71,9 +72,8 @@ plot(imag(IQ_reshaped(:, 50)))
 legend('real','estimated')
 
 
-%% 4b Generate and plot bmode image
+%% 4b. Experiment 1.2 Generate and plot expected and simulated bmode image
 IQ_reshaped_augm = IQ_reshaped;
-IQ_reshaped_augm(:, 1:30) = 0;
 
 IQb_estimated = Mdas * IQ_reshaped_augm(:);
 IQb_estimated =  reshape(IQb_estimated,bmode_size);
@@ -87,7 +87,61 @@ c = colorbar;
 c.YTick = [0 255];
 c.YTickLabel = {'-30 dB','0 dB'};
 colormap gray
-title('A simulated ultrasound image')
+title('Estimated bmode')
+ylabel('[cm]')
+shading interp
+axis equal ij tight
+set(gca,'XColor','none','box','off')
+
+subplot(1, 2, 2)
+pcolor(x*100,z*100,bmode_image)
+c = colorbar;
+c.YTick = [0 255];
+c.YTickLabel = {'-30 dB','0 dB'};
+colormap gray
+title('Real bmode')
+ylabel('[cm]')
+shading interp
+axis equal ij tight
+set(gca,'XColor','none','box','off')
+
+%% 5b. Experiment 1.3 Generate and plot expected and simulated bmode image
+% when the IQ data are corrupted (some columns are put to 0)
+
+IQ_corrupted = IQ;
+IQ_corrupted(:, 1:32) = 0;
+IQb = Mdas*IQ_corrupted(:);
+IQb = reshape(IQb,size(x));
+bmode_image_corrupted = bmode(IQb,DR);
+
+IQ_reshaped_augm = IQ_reshaped;
+IQ_reshaped_augm(:, 1:32) = 0;
+
+IQb_estimated = Mdas * IQ_reshaped_augm(:);
+IQb_estimated =  reshape(IQb_estimated,bmode_size);
+bmode_estimated_corrupted = bmode(IQb_estimated,30);
+
+fig = figure(1);
+
+subplot(1, 2, 1)
+pcolor(x*100,z*100,bmode_estimated_corrupted)
+c = colorbar;
+c.YTick = [0 255];
+c.YTickLabel = {'-30 dB','0 dB'};
+colormap gray
+title('Estimated bmode')
+ylabel('[cm]')
+shading interp
+axis equal ij tight
+set(gca,'XColor','none','box','off')
+
+subplot(1, 2, 2)
+pcolor(x*100,z*100,bmode_image_corrupted)
+c = colorbar;
+c.YTick = [0 255];
+c.YTickLabel = {'-30 dB','0 dB'};
+colormap gray
+title('Real bmode')
 ylabel('[cm]')
 shading interp
 axis equal ij tight
