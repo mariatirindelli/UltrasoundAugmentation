@@ -57,7 +57,7 @@ class Deformation(us.BaseMethod):
             #lat_smothing = np.flip(lat_smothing)
             displacement_field[y, x_tl-n:x_tl] = lat_smothing
 
-        n = 70
+        n = 100
         for y in range(label.shape[0]):
 
             lat_smothing = np.linspace(displacement_field[y, x_tr-1]*0.0, displacement_field[y, x_tr-1], n)
@@ -66,7 +66,7 @@ class Deformation(us.BaseMethod):
             displacement_field[y, x_tr:x_tr+n] = lat_smothing
 
         n_gauss = len(displacement_field[300::, 0])
-        gauss_d = self.gaussian(np.linspace(0, n_gauss, n_gauss), 0, 10)
+        gauss_d = self.gaussian(np.linspace(0, n_gauss, n_gauss), 0, 15)
 
         for col in range(displacement_field.shape[1]):
             displacement_field[300::, col] = gauss_d*displacement_field[300::, col]
@@ -88,9 +88,9 @@ class Deformation(us.BaseMethod):
         deformed_apple = cv2.remap(img, mapx.astype(np.float32), mapy.astype(np.float32), cv2.INTER_CUBIC)
 
         plt.subplot(1, 2, 1)
-        plt.imshow(deformed_apple, cmap='gray')
-        plt.subplot(1, 2, 2)
         plt.imshow(image, cmap='gray')
+        plt.subplot(1, 2, 2)
+        plt.imshow(deformed_apple, cmap='gray')
         plt.show()
 
 def command_iteration(method):

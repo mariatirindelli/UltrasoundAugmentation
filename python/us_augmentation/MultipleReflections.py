@@ -6,13 +6,13 @@ import os
 
 
 class MultipleReflections(us.BaseMethod):
-    def __init__(self, blur_kernel=45, blur_sigma=20, apply_blur=True):
+    def __init__(self, blur_kernel=45, blur_sigma=20, apply_blur=True, reflection_intensity=0.65, plot_result=False):
         super(MultipleReflections, self).__init__()
         self.blur_kernel = blur_kernel
         self.blur_sigma = blur_sigma
         self.apply_blur = apply_blur
-
-
+        self.reflection_intensity = reflection_intensity
+        self.plot_result = plot_result
 
     @staticmethod
     def _find_centroid(labelmap):
@@ -38,6 +38,16 @@ class MultipleReflections(us.BaseMethod):
 
         return translated_mask, translated_image_patch
 
+    @staticmethod
+    def _plot(image, label, augmented_image):
+        plt.subplot(1, 3, 1)
+        plt.imshow(label)
+        plt.subplot(1, 3, 2)
+        plt.imshow(image, cmap='gray')
+        plt.subplot(1, 3, 2)
+        plt.imshow(augmented_image, cmap='gray')
+        plt.show()
+
     def execute(self, image, label=None):
 
         if label is None:
@@ -56,21 +66,20 @@ class MultipleReflections(us.BaseMethod):
         # transducer, i.e. yc
         y_reflection = y_c * 2
 
-        yx_bones = np.argwhere(label > 0)
-        y_c = np.mean(yx_bones[:, 0])
-
-        # 4. Getting the translated blurred mask
+        # 4. Getting the translated blurred mask and the masked, translated image patched
         blur_reflection_mask, reflection_image_patch = \
             self.translate_image_patch(image, blur_label, 0, int(y_reflection - y_c))
 
         # 5. Getting the non blurred translated label
         reflection_mask, _ = self.translate_image_patch(image, label, 0, int(y_reflection - y_c))
 
-        resulting_image = blur_reflection_mask * reflection_image_patch * 0.65 + \
-                          (1 - blur_reflection_mask * 0.65) * image * 2
+        augmented_image = blur_reflection_mask * reflection_image_patch * self.reflection_intensity + \
+                          (1 - blur_reflection_mask * self.reflection_intensity) * image * 2
 
-        plt.imshow(resulting_image)
-        plt.show()
+        if self.plot_result:
+            self._plot(image, label, augmented_image)
+
+        return augmented_image
 
 
 if __name__ == '__main__':
@@ -80,5 +89,5 @@ if __name__ == '__main__':
     img = cv2.imread(os.path.join(root, "test.png"), cv2.IMREAD_GRAYSCALE)
     gt = cv2.imread(os.path.join(root, "test_label.png"), cv2.IMREAD_GRAYSCALE)
 
-    method = MultipleReflections(apply_blur=True)
+    method = MultipleReflections(apply_blur=True, plot_result=True)
     method.execute(img, gt)
