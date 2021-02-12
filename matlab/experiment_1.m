@@ -79,7 +79,7 @@ IQb_estimated = Mdas * IQ_reshaped_augm(:);
 IQb_estimated =  reshape(IQb_estimated,bmode_size);
 bmode_estimated = bmode(IQb_estimated,30);
 
-fig = figure(1);
+fig = figure(2);
 
 subplot(1, 2, 1)
 pcolor(x*100,z*100,bmode_estimated)
