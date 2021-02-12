@@ -20,6 +20,7 @@ class ProbeTilting(us.BaseMethod):
                  shadow_start=40,
                  angle_weight=0.7,
                  distance_weight=0.3,
+                 dilation_kernel=(10, 10),
                  apply_blur=True,
                  mode='gaussian',
                  plot_result=True):
@@ -41,6 +42,8 @@ class ProbeTilting(us.BaseMethod):
         self.shadow_mask_blur_sigmas = [shadow_mask_blur_sigmas[0], shadow_mask_blur_sigmas[1]]
         self.shadow_start = shadow_start
 
+        self.dilation_kernel = np.ones([dilation_kernel[0], dilation_kernel[1]])
+
         # For now not used parameters
         self.max_distance_error = 0.05
         self.mode = mode  # can be 'curve_gaussian', 'distance_angle' - it defines how intensities are rescaled on the
@@ -49,7 +52,7 @@ class ProbeTilting(us.BaseMethod):
 
     def execute(self, image, label, xy_probe=(0, 0), alpha_probe=0):
 
-        label = cv2.dilate(label, np.ones((10, 10), np.uint8), iterations=1)
+        label = cv2.dilate(label, self.dilation_kernel, iterations=1)
 
         # 1. Fitting polynomial to label map
         p = self.fit_polynomial_to_label(label)
