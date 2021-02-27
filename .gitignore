@@ -5,3 +5,11 @@ matlab/test_result/
 python/us_augmentation/__pycache__/
 matlab/monogenic_signal_matlab-master/
 .idea/
+python/models_training/datasets/__pycache__/BoneSegmentation.cpython-37.pyc
+python/models_training/datasets/__pycache__/
+python/models_training/models/__pycache__/
+python/models_training/us_augmentation/__pycache__/
+python/models_training/utils/__pycache__/
+python/models_training/venv/
+python/results_evaluation/utils/__pycache__/
+python/remote_debugging/script.sh

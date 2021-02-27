@@ -1,0 +1,22 @@
+module : bone_segmentation2d.BoneSegmentation
+dataset : BoneSegmentation.BoneSegmentationDb
+model : unet_2d.UNet2D
+data_root : /mnt/data/mariatirindelli/BoneSegmentation/linear_probe/cross_val0
+output_path : /mnt/data/mariatirindelli/output/classicalAugm
+num_workers : 6
+batch_size : 5
+log_every_n_steps : 30
+learning_rate : 0.01
+min_epochs : 50
+max_epochs : 150
+in_channels : 1
+out_channels: 1
+gpus : 0
+early_stopping_metric : val_loss
+augmentation_mode : 'classical'
+m_reflection_prob : 0.0
+deformation_prob : 0.0
+tilting_prob : 0.0
+noise_prob : 0.0
+use_positive_weights : False
+loss_function : 'BCE'

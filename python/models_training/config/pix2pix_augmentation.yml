@@ -1,0 +1,19 @@
+module : gan_image_generation.GanImageGeneration
+dataset : FacadesDataset.Facades
+model : pix2pix.Pix2Pix
+data_root : /mnt/data/mariatirindelli/BoneSegmentation/linear_probe/cross_val0/train
+output_path : /mnt/data/mariatirindelli/output/Pix2Pix
+num_workers : 6
+batch_size : 4
+log_every_n_steps : 10
+learning_rate : 0.0002
+min_epochs : 1
+max_epochs : 100
+in_channels : 1
+out_channels: 1
+gpus : 0
+early_stopping_metric : Train_Loss
+target_size : 256
+use_bn : True
+use_dropout : True
+test_only: False
