@@ -1,5 +1,5 @@
 module : multiclass_classifier.MultiClassClassification
-dataset : SpinousProcessClassification.SpinousProcessClassificationDb
+dataset : BoneClassification.BoneClassificationDb
 model : resnet.ResNet
 data_root : /data/Chrissi_US_augmentation/BoneClassification/
 num_workers : 6
@@ -12,9 +12,11 @@ input_channels : 1
 gpus : 0
 early_stopping_metric : val_loss
 augmentation_mode : 'classical'
-m_reflection_prob : 0.3
-deformation_prob : 0.3
-tilting_prob : 0.3
+m_reflection_prob : 0.25
+deformation_prob : 0.25
+tilting_prob : 0.25
+noise_prob : 0.25
+classical_prob : 0.3
 num_target_classes : 2
 image_width: 272
 image_height: 503

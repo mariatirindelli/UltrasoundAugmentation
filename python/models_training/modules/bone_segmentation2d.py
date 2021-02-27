@@ -86,7 +86,7 @@ class BoneSegmentation(pl.LightningModule):
             self.log('Train bce loss', train_losses['bce_loss'])
             self.log('Train dice loss', train_losses['dice_loss'])
 
-        if batch_idx % 150 == 0:
+        if batch_idx % 300 == 0:
             sigmoid_pred = torch.sigmoid(y_pred)
             self.log_images(x, y_true, sigmoid_pred.detach(), self.current_epoch, batch_idx, filename,
                             'train', augmentations)

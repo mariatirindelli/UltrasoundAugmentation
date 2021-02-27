@@ -1,22 +1,23 @@
 module : multiclass_classifier.MultiClassClassification
-dataset : SpinousProcessClassification.SpinousProcessClassificationDb
+dataset : BoneClassification.BoneClassificationDb
 model : resnet.ResNet
-data_root : D:\Chrissi\spine\NAS\BoneClassification\cross_val_0
-output_path : D:\Chrissi\spine\NAS\BoneClassificationNoise\output
-num_workers : 0
+data_root : D:\Chrissi\spine\NAS\BoneClassification\cross_val0
+output_path : D:\Chrissi\spine\NAS\BoneClassification\output
+num_workers : 6
 batch_size : 5
 log_every_n_steps : 10
 learning_rate : 0.01
 min_epochs : 1
-max_epochs : 10
+max_epochs : 2
 input_channels : 1
 gpus : 0
 early_stopping_metric : val_loss
-augmentation_mode : 'classical'
+augmentation_mode : 'm_reflection'
 m_reflection_prob : 0.0
 deformation_prob : 0.0
 tilting_prob : 0.0
 noise_prob : 0.0
+classical_prob : 0.3
 num_target_classes : 2
 image_width: 272
 image_height: 503
