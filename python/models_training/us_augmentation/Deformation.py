@@ -270,7 +270,7 @@ class Deformation(us.BaseMethod):
 
         # 4. Smoothing transition at the bone right
         displacement_field = self.add_right_transition_displacement(displacement_field=displacement_field,
-                                                                    x_l=x_tl)
+                                                                    x_l=x_tr)
 
         # 5. Smoothing transition at the bone left
         displacement_field = self.add_left_transition_displacement(displacement_field=displacement_field,
