@@ -13,3 +13,5 @@ python/models_training/utils/__pycache__/
 python/models_training/venv/
 python/results_evaluation/utils/__pycache__/
 python/remote_debugging/script.sh
+python/models_training/.polyaxon/.polyaxongroup
+python/models_training/.polyaxon/.polyaxonproject

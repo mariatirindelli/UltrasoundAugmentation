@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import cv2
 import utils
 import pandas as pd
+from scipy.spatial.distance import directed_hausdorff
 
 def sigmoid(x):
     return np.exp(-np.logaddexp(0, -x))
@@ -47,6 +48,13 @@ def dice_score(gt, pred):
     dice = numerator / denominator
     return dice
 
+def hausdorff_score(gt, pred):
+    gt_coordinates = np.argwhere(gt > 0)
+    pred_coordinates = np.argwhere(pred > 0)
+
+    hd = max(directed_hausdorff(gt_coordinates, pred_coordinates)[0], directed_hausdorff(pred_coordinates, gt_coordinates)[0])
+    return hd
+
 
 def evaluate_experiment(root, experiment_id, metric):
 
@@ -63,6 +71,7 @@ def evaluate_experiment(root, experiment_id, metric):
     file_list = [item for item in file_list if ".npy" in item and "image" in item]
 
     dice_list = []
+    hd_list = []
     filename_list = []
 
     num_files = len(file_list)
@@ -78,13 +87,17 @@ def evaluate_experiment(root, experiment_id, metric):
         binary_pred = np.where(pred > 0.5, 1, 0)
         dice = dice_score(label, binary_pred)
         dice_list.append(dice)
+
+        hd = hausdorff_score(label, binary_pred)
+        hd_list.append(hd)
+
         filename_list.append(image_name.replace("_image.npy", ""))
         print("\r Progress: {0:.1f}%".format(i/num_files * 100), end="")
 
-    df = pd.DataFrame({'filenames': filename_list, 'dice_scores':dice_list})
+    df = pd.DataFrame({'filenames': filename_list, 'dice_scores':dice_list, 'hd_scores': hd})
     df.to_csv(os.path.join("D:\\NAS\\output\\1988", experiment_id,  "test_results_rec.csv"))
     print("\n")
-    return dice_list
+    return dice_list, hd_list
 
 def print_group_parameters(cross_val_group_id, cross_val_group_dict):
     print("---------------------------------------------------")
@@ -97,25 +110,31 @@ def print_group_parameters(cross_val_group_id, cross_val_group_dict):
 
 def evaluate_group_results(group_path, group_experiments, metric):
 
-    experiments_result = []
+    experiments_result_dice = []
+    experiments_result_hd = []
     for i, experiment in enumerate(group_experiments):
 
-        results = evaluate_experiment(group_path, experiment, metric)
-        if len(results) == 0:
+        result_dice, result_hd = evaluate_experiment(group_path, experiment, metric)
+        if len(result_dice) == 0:
             print("No results for experiment: {}".format(experiment))
             continue
-        if isinstance(results[0], str):
-            result_list = [item.strip("tensor(") for item in results]
+        if isinstance(result_dice[0], str):
+            result_list = [item.strip("tensor(") for item in result_dice]
             result_list = [float(item.split(",")[0]) for item in result_list]
             mean_dice = np.mean(result_list)
         else:
-            mean_dice = np.mean(results)
-        experiments_result.append(mean_dice)
+            mean_dice = np.mean(result_dice)
+            mean_hd = np.mean(result_hd)
+        experiments_result_dice.append(mean_dice)
+        experiments_result_hd.append(mean_hd)
 
-    print("5-fold cross validation Dice - Mean: ", np.mean(experiments_result), " Std: ", np.std(experiments_result))
-    logging.info("5-fold cross validation Dice - Mean: ", np.mean(experiments_result), " Std: ", np.std(experiments_result))
+    print("5-fold cross validation Dice - Mean: ", np.mean(experiments_result_dice), " Std: ", np.std(experiments_result_dice))
+    logging.info("5-fold cross validation Dice - Mean: ", np.mean(experiments_result_dice), " Std: ", np.std(experiments_result_dice))
 
-    return np.mean(experiments_result), np.std(experiments_result)
+    print("5-fold cross validation Hd - Mean: ", np.mean(experiments_result_hd), " Std: ", np.std(experiments_result_hd))
+    logging.info("5-fold cross validation Hd - Mean: ", np.mean(experiments_result_hd), " Std: ", np.std(experiments_result_hd))
+
+    return np.mean(experiments_result_dice), np.std(experiments_result_dice), np.mean(experiments_result_hd), np.std(experiments_result_hd)
 
 def main(params):
 
@@ -128,12 +147,15 @@ def main(params):
 
         current_group = cross_val_groups[cross_val_group_id]
         print_group_parameters(cross_val_group_id, current_group)
-        mean_dice, std_dice = evaluate_group_results(group_path=params.group_path,
+        mean_dice, std_dice, mean_hd, std_hd = evaluate_group_results(group_path=params.group_path,
                                                      group_experiments=current_group["cross_val_folders_ids"],
                                                      metric=params.metric)
 
         current_group["meandDice"] = mean_dice
         current_group["stdDice"] = std_dice
+
+        current_group["meandHd"] = mean_hd
+        current_group["stdHd"] = std_hd
 
         # saving parameters and results for the group in the dataframe:
         row_labels.append("Experiment: " + str(i))

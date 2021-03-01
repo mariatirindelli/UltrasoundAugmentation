@@ -77,6 +77,9 @@ class BoneSegmentation(pl.LightningModule):
         augmentations = train_batch['augmentations']
         pos_weights = train_batch['pos_weights']
 
+        if self.hparams.input_type=='Float':
+            x = x.float()
+
         y_pred = self.forward(x)
 
         train_losses = self.compute_loss(y_pred, y_true, pos_weights)
@@ -107,6 +110,9 @@ class BoneSegmentation(pl.LightningModule):
         augmentations = val_batch['augmentations']
         pos_weights = val_batch['pos_weights']
 
+        if self.hparams.input_type=='Float':
+            x = x.float()
+
         y_pred = self.forward(x)
         val_losses = self.compute_loss(y_pred, y_true, pos_weights)
         val_loss = val_losses['total_loss']
@@ -136,11 +142,15 @@ class BoneSegmentation(pl.LightningModule):
         x = test_batch['image']
         y_true = test_batch['label']
         filename = test_batch['filename']
+
+        if self.hparams.input_type=='Float':
+            x = x.float()
+
         y_pred = self.forward(x)
 
         test_acc = self.dice_score(gt=y_true,
-                                    predictions=y_pred.clone(),
-                                    prob=self.hparams.probability_threshold)
+                                   predictions=y_pred.clone(),
+                                   prob=self.hparams.probability_threshold)
 
         self.save_test_image(test_batch, y_pred, self.hparams.output_path)
 
@@ -255,6 +265,7 @@ class BoneSegmentation(pl.LightningModule):
         module_specific_args.add_argument('--in_channels', default=1, type=int)
         module_specific_args.add_argument('--out_channels', default=1, type=int)
         module_specific_args.add_argument('--probability_threshold', default=0.5, type=float)
+        module_specific_args.add_argument('--input_type', default='Double', type=str)
         parser.add_argument("--use_positive_weights", type=str2bool, nargs='?', const=True, default=True,
                             help="Activate nice mode.")
         module_specific_args.add_argument('--loss_function', default='BCE', type=str)
