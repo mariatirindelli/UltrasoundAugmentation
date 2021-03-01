@@ -8,12 +8,10 @@ tags: [group]
 hptuning:
   matrix:
     data_root:
-      values: [/data/Chrissi_US_augmentation/BoneClassification/cross_val0, /data/Chrissi_US_augmentation/BoneClassification/cross_val1,
-               /data/Chrissi_US_augmentation/BoneClassification/cross_val2, /data/Chrissi_US_augmentation/BoneClassification/cross_val3,
-               /data/Chrissi_US_augmentation/BoneClassification/cross_val4]
+      values: [/data/Chrissi_US_augmentation/BoneClassification/cross_val0, /data/Chrissi_US_augmentation/BoneClassification/cross_val1, /data/Chrissi_US_augmentation/BoneClassification/cross_val2, /data/Chrissi_US_augmentation/BoneClassification/cross_val3, /data/Chrissi_US_augmentation/BoneClassification/cross_val4]
 
     augmentation_mode:
-      values: [ 'tilting', 'deformation', 'm_reflection', 'all', 'none', 'classical' ]
+      values: ['none', 'tilting', 'deformation', 'm_reflection', 'noise', 'classical']
 
 build:
   image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
@@ -41,6 +39,6 @@ declarations:
 run:
   cmd:
    - python -u train.py -c={{ config_file }} \
-                         --data_root={{ data_root }}
-                         --augmentation_mode={{ augmentation_mode }}
+                         --data_root={{ data_root }} \
+                         --augmentation_mode={{ augmentation_mode }} \
                          --on_polyaxon

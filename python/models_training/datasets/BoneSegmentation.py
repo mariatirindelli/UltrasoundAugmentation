@@ -63,7 +63,8 @@ class BoneSegmentationDb(pl.LightningDataModule):
                                                            tilting_prob=0,
                                                            deformation_prob=0,
                                                            m_reflection_prob=0,
-                                                           noise_prob=0)
+                                                           noise_prob=0,
+                                                           classical_prob=0)
             elif self.hparams.augmentation_mode == 'tilting':
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
@@ -71,7 +72,8 @@ class BoneSegmentationDb(pl.LightningDataModule):
                                                            tilting_prob=self.hparams.tilting_prob,
                                                            deformation_prob=0,
                                                            m_reflection_prob=0,
-                                                           noise_prob=0)
+                                                           noise_prob=0,
+                                                           classical_prob=0)
             elif self.hparams.augmentation_mode == 'deformation':
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
@@ -79,7 +81,8 @@ class BoneSegmentationDb(pl.LightningDataModule):
                                                            tilting_prob=0,
                                                            deformation_prob=self.hparams.deformation_prob,
                                                            m_reflection_prob=0,
-                                                           noise_prob=0)
+                                                           noise_prob=0,
+                                                           classical_prob=0)
             elif self.hparams.augmentation_mode == 'm_reflection':
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
@@ -87,7 +90,8 @@ class BoneSegmentationDb(pl.LightningDataModule):
                                                            tilting_prob=0,
                                                            deformation_prob=0,
                                                            m_reflection_prob=self.hparams.m_reflection_prob,
-                                                           noise_prob=0)
+                                                           noise_prob=0,
+                                                           classical_prob=0)
             elif self.hparams.augmentation_mode == 'noise':
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
@@ -95,7 +99,8 @@ class BoneSegmentationDb(pl.LightningDataModule):
                                                            tilting_prob=0,
                                                            deformation_prob=0,
                                                            m_reflection_prob=0,
-                                                           noise_prob=self.hparams.noise_prob)
+                                                           noise_prob=self.hparams.noise_prob,
+                                                           classical_prob=0)
             elif self.hparams.augmentation_mode == 'all':
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
@@ -103,7 +108,8 @@ class BoneSegmentationDb(pl.LightningDataModule):
                                                            tilting_prob=self.hparams.tilting_prob,
                                                            deformation_prob=self.hparams.deformation_prob,
                                                            m_reflection_prob=self.hparams.m_reflection_prob,
-                                                           noise_prob=self.hparams.noise_prob)
+                                                           noise_prob=self.hparams.noise_prob,
+                                                           classical_prob=0)
             elif self.hparams.augmentation_mode == 'classical':
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
@@ -112,6 +118,7 @@ class BoneSegmentationDb(pl.LightningDataModule):
                                                            deformation_prob=0,
                                                            m_reflection_prob=0,
                                                            noise_prob=0,
+                                                           classical_prob=self.hparams.classical_prob,
                                                            classical_augmentation=True)
 
     def __dataloader(self, split=None):
@@ -163,6 +170,7 @@ class BoneSegmentationDb(pl.LightningDataModule):
         mnist_specific_args.add_argument('--deformation_prob', default=0.5, type=float)
         mnist_specific_args.add_argument('--m_reflection_prob', default=0.5, type=float)
         mnist_specific_args.add_argument('--noise_prob', default=0.5, type=float)
+        mnist_specific_args.add_argument('--classical_prob', default=0.5, type=float)
         mnist_specific_args.add_argument('--augmentation_mode', default='none', type=str)
         mnist_specific_args.add_argument('--gaussian_kernel', default=15, type=int)
         mnist_specific_args.add_argument('--gaussian_sigma', default=5, type=int)
@@ -173,7 +181,7 @@ class BoneSegmentationDataset(Dataset):
     """BoneSegmentationDataset dataset."""
 
     def __init__(self, root_dir, split, augmentation_prob=0.5, tilting_prob=0, deformation_prob=0, m_reflection_prob=0,
-                 noise_prob=0, classical_augmentation=False, pix2pix_augmentation=False):
+                 noise_prob=0, classical_prob=0.0, classical_augmentation=False, pix2pix_augmentation=False):
         self.split = split
         self.root_dir = os.path.join(root_dir, split)
         self.data_list = os.listdir(os.path.join(self.root_dir, "images"))
@@ -189,13 +197,8 @@ class BoneSegmentationDataset(Dataset):
         self.deformation_prob = deformation_prob
         self.m_reflection_prob = m_reflection_prob
         self.noise_prob = noise_prob
-        self.pix2pix_augmentation = pix2pix_augmentation
-        self.pix2pix_augmentation_dir = os.path.join( os.path.split(root_dir)[0], "pix2pix_augmentations")
+        self.classical_prob = classical_prob
         self.classical_augmentation = classical_augmentation
-
-        if pix2pix_augmentation:
-            for i in range(15):
-                self.data_list.extend(self.data_list)
 
         self.transform = transforms.ToTensor()  # converts to tensor and normalize between 0 and 1
 
@@ -206,14 +209,8 @@ class BoneSegmentationDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        if int(idx / self.n_non_augmented_images) == 0:
-            img_name = os.path.join(self.root_dir, "images", self.data_list[idx])
-            label_name = os.path.join(self.root_dir, "labels", self.data_list[idx].split(".")[0] + "_label.png")
-
-        else:
-            augm_id = str(int(idx / self.n_non_augmented_images))
-            img_name = os.path.join(self.pix2pix_augmentation_dir, "augm" + augm_id, self.data_list[idx])
-            label_name = os.path.join(self.root_dir, "labels", self.data_list[idx].split(".")[0] + "_label.png")
+        img_name = os.path.join(self.root_dir, "images", self.data_list[idx])
+        label_name = os.path.join(self.root_dir, "labels", self.data_list[idx].split(".")[0] + "_label.png")
 
         # reading images and labels
         image = io.imread(img_name)
@@ -235,11 +232,14 @@ class BoneSegmentationDataset(Dataset):
         image = self.transform(image)
         label = self.transform(label)
 
-        if self.classical_augmentation:
+        if self.split != "test" and self.classical_augmentation:
             image, label, augmentation_string = self.apply_classical_augmentation(image, label)
 
+        # Making sure the label is binary (deformation might have blurred the label)
+        label = torch.where(label >= 0.5, 1, 0)
+
         sample = {'image': image,
-                  'label': label,
+                  'label': label.float(),
                   'filename': self.data_list[idx],
                   'pos_weights': pos_weights,
                   'augmentations': augmentation_string}
@@ -257,7 +257,7 @@ class BoneSegmentationDataset(Dataset):
 
         augmentation_string = ''
         # Apply rotation
-        if random.random() <= 0.3:
+        if random.random() <= self.classical_prob:
             affine_params = transforms.RandomAffine.get_params(degrees=[-10, 10],
                                                                translate=[0.2, 0.2],
                                                                scale_ranges=[1, 1],

@@ -7,6 +7,8 @@ from pytorch_lightning.metrics import Accuracy
 from pytorch_lightning.core.lightning import LightningModule
 from utils.utils import get_argparser_group
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pandas as pd
@@ -75,6 +77,7 @@ class MultiClassClassification(LightningModule):
     # If using metrics in data parallel mode (dp), the metric update/logging should be done in the training_step_end
     # This is due to metric states else being destroyed after each forward pass, leading to wrong accumulation.
     def training_step_end(self, train_step_output):
+        self.log('Train Total Loss', train_step_output['loss'], on_step=True, on_epoch=True)
         return train_step_output
 
     # 5 Validation Loop
@@ -83,6 +86,10 @@ class MultiClassClassification(LightningModule):
         y_true = val_batch['label']
         y_pred = self.forward(x)
         val_loss = self.loss_function(y_pred, y_true)
+
+        y_pred = torch.argmax(y_pred, dim=1, keepdim=True)
+        correct_predictions = torch.sum((y_pred == y_true))
+        val_acc = correct_predictions/y_true.size(0)
 
         if batch_idx % 500 == 0:
             y_pred = torch.argmax(y_pred, dim=1, keepdim=True)
@@ -93,12 +100,12 @@ class MultiClassClassification(LightningModule):
                             batch_idx=batch_idx,
                             phase='val')
 
-        return {'val_loss': val_loss}
+        return {'val_loss': val_loss, 'val_acc': val_acc}
 
     # If using metrics in data parallel mode (dp), the metric update/logging should be done in the validation_step_end
     # This is due to metric states else being destroyed after each forward pass, leading to wrong accumulation.
     def validation_step_end(self, val_step_output):
-
+        self.log('Val Total Loss', val_step_output['val_loss'], on_step=True, on_epoch=True)
         return val_step_output
 
     # 6 Test Loop
@@ -111,29 +118,33 @@ class MultiClassClassification(LightningModule):
 
         return {'test_loss': loss, 'test_label':y_true, 'test_pred': y_pred}
 
-    def test_step_end(self, test_step_output):
+    def test_epoch_end(self, test_step_output):
         correctly_labeled = 0
         total_num_samples = 0
 
         y_true_list = []
         y_pred_list = []
         for item in test_step_output:
-            y_true = np.squeeze(item['test_label'].to("cpu").numpy())
-            y_pred = np.squeeze(item['test_pred'].to("cpu").numpy())
+            y_true = item['test_label'].to("cpu").numpy().flatten()
+            y_pred = item['test_pred'].to("cpu").numpy().flatten()
 
             correctly_labeled += np.sum(np.where(y_pred == y_true, 1, 0))
-            total_num_samples += len(y_true)
+            total_num_samples += y_true.size
+
+            if y_true.size == 1:
+                y_true_list.extend(y_true)
+                y_pred_list.extend(y_pred)
+                continue
 
             y_true_list.extend(y_true.tolist())
             y_pred_list.extend(y_pred.tolist())
 
         pd_frame = pd.DataFrame({'y_true':y_true_list, 'y_pred':y_pred_list})
-        pd_frame_metric = pd.DataFrame({'accuracy':correctly_labeled/total_num_samples})
+        pd_frame_metric = pd.DataFrame({'accuracy':[correctly_labeled/total_num_samples]})
 
         pd_frame.to_csv(os.path.join(self.hparams.output_path, "test_results.csv"))
         pd_frame_metric.to_csv(os.path.join(self.hparams.output_path, "metrics.csv"))
-
-        return test_step_output
+        self.log('Test Accuracy', correctly_labeled/total_num_samples)
 
     def log_images(self, x, y_true, y_pred, current_epoch, batch_idx, filename=" ", phase='', augmentations=" "):
 
