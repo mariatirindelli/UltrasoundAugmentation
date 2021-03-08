@@ -1,0 +1,56 @@
+---
+version: 1
+
+kind: group
+
+tags: [group]
+
+hptuning:
+  matrix:
+    resume_from_checkpoint:
+      values: [/mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=26-Train_Loss=8.59,
+               /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=30-Train_Loss=10.96,
+               /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=35-Train_Loss=9.23,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=40-Train_Loss=7.42,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=45-Train_Loss=9.53,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=50-Train_Loss=9.97,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=55-Train_Loss=8.70,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=60-Train_Loss=8.50,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=65-Train_Loss=10.58,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=70-Train_Loss=10.42,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=75-Train_Loss=7.58,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=80-Train_Loss=9.81,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=85-Train_Loss=6.21,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=90-Train_Loss=7.56,
+                /mnt/data/mariatirindelli/output/Pix2Pix/51014_GanImageGeneration_Facades_pix2pix_Pix2Pix-epoch=95-Train_Loss=8.13
+               ]
+
+build:
+  image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
+  build_steps:
+    - apt-get update
+    - apt install -y libgl1-mesa-glx
+    - apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev
+    - pip install -r requirements.txt
+
+environment:
+  resources:
+    cpu:
+      requests: 4
+      limits: 8
+    memory:
+      requests: 8192
+
+    gpu:
+      requests: 1
+      limits: 1
+
+declarations:
+  config_file: config/pix2pix_augmentation.yml
+  data_root : /data/BoneSegmentation/linear_probe/cross_val0/train
+
+run:
+  cmd:
+   - python -u train_pix2pix.py -c={{ config_file }} \
+                         --data_root={{ data_root }}
+                         --on_polyaxon
