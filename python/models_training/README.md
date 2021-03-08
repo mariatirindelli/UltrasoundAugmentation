@@ -42,6 +42,8 @@ For experiment:
 ```
 ssh -L 16006:127.0.0.1:6006 mariatirindelli@nevarro.ifl
 source /home/mariatirindelli/mariaenv/bin/activate
+
+cd /tmp/pycharm_project_932
 tensorboard --logdir .
 ```
 

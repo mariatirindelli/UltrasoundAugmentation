@@ -1,11 +1,8 @@
 import pytorch_lightning as pl
 from utils.utils import get_argparser_group
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import os
-from PIL import Image
 import torch
+from models import networks
+from utils.image_logging import log_images
 
 class GanImageGeneration(pl.LightningModule):
     def __init__(self, hparams, model, logger=None):
@@ -14,202 +11,97 @@ class GanImageGeneration(pl.LightningModule):
 
         self.hparams = hparams
         self.model = model
-        # self.example_input_array = torch.zeros(1, 1, 256, 256)
 
-        # TODO: losses might be moved here
-        # self.adversarial_criterion = nn.BCEWithLogitsLoss()
-        # self.recon_criterion = nn.L1Loss()
+        # define loss functions
+        self.criterionGAN = networks.GANLoss(hparams.gan_mode).to(self.device)
+        self.criterionL1 = torch.nn.L1Loss()
+        self.logger = logger[0] if logger is not None else None
 
     def configure_optimizers(self):
-        return self.model.configure_optimizers()
 
-    # def forward(self, real, condition = None, optimizer_idx=0):
-    #
-    #     if condition is None:
-    #         return 0
-    #     if optimizer_idx == 0:
-    #
-    #         fake_images = self.gen(condition).detach()
-    #         logits = self.patch_gan(fake_images, condition)
-    #
-    #         real_logits = self.patch_gan(real, condition)
-    #
-    #
-    #     elif optimizer_idx == 1:
-    #         fake_images = self.gen(condition)
-    #         logits = self.patch_gan(fake_images, condition)
-    #         adversarial_loss = self.adversarial_criterion(disc_logits, torch.ones_like(disc_logits))
-    #
-    #         # calculate reconstruction loss
-    #         recon_loss = self.recon_criterion(fake_images, real)
-    #         lambda_recon = self.hparams.lambda_recon
-    #         loss = self.model.forward(real, condition, step='gen')
-    #
-    #     return fake_images, logits, real_logits
+        discriminator_optimizer = torch.optim.Adam(self.model.discriminator.parameters(),
+                                                   lr=self.hparams.learning_rate,
+                                                   betas=(self.hparams.beta1, 0.999))
+        generator_optimizer = torch.optim.Adam(self.model.generator.parameters(),
+                                               lr=self.hparams.learning_rate,
+                                               betas=(self.hparams.beta1, 0.999))
+
+        return discriminator_optimizer, generator_optimizer
+
+    def forward(self, x):
+        return self.model.forward(x)
 
     def training_step(self, batch, batch_idx, optimizer_idx):
 
-        real, condition, _ = batch
+        real_images, conditions = batch
 
         # Discriminator step
         if optimizer_idx == 0:
-            fake_images = self.model.gen(condition).detach()
-            fake_logits = self.model.patch_gan(fake_images, condition)
 
-            real_logits = self.model.patch_gan(real, condition)
+            # Loss on discriminating fake images
+            fake_images = self.forward(conditions).detach()
+            fake_discriminator_input = torch.cat((conditions, fake_images), 1)
+            fake_predictions = self.model.discriminator(fake_discriminator_input)
+            discriminator_loss_fake = self.criterionGAN(fake_predictions, False)
 
-            fake_loss = self.model.adversarial_criterion(fake_logits, torch.zeros_like(fake_logits))
-            real_loss = self.model.adversarial_criterion(real_logits, torch.ones_like(real_logits))
+            # Loss on discriminating real images
+            real_discriminator_input = torch.cat((conditions, real_images), 1)
+            real_predictions = self.model.discriminator(real_discriminator_input)
+            discriminator_loss_real = self.criterionGAN(real_predictions, True)
 
-            loss = (real_loss + fake_loss) / 2
-            self.log('Discriminator Loss', loss)
+            discriminator_loss = (discriminator_loss_real + discriminator_loss_fake) * 0.5
+
+            if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0:
+                fig, title = log_images(epoch=self.current_epoch,
+                                        batch_idx=batch_idx,
+                                        image_list=[conditions, real_images, fake_images],
+                                        image_name_list=['condition', 'real image', 'fake image'],
+                                        cmap_list=['hot', 'gray', 'gray'],
+                                        filename=[''],
+                                        phase='train')
+
+                self.logger[0].experiment.add_figure(tag=title, figure=fig)
+
+            output = {'loss': discriminator_loss}
+            return output
 
         # Generator step
         elif optimizer_idx == 1:
             # Pix2Pix has adversarial and a reconstruction loss
-            # First calculate the adversarial loss
-            fake_images = self.model.gen(condition)
-            disc_logits = self.model.patch_gan(fake_images, condition)
-            adversarial_loss = self.model.adversarial_criterion(disc_logits, torch.ones_like(disc_logits))
+            fake_images = self.forward(conditions)
+            fake_discriminator_input = torch.cat((conditions, fake_images), 1)
+            fake_predictions = self.model.discriminator(fake_discriminator_input)
+            generator_adversarial_loss = self.criterionGAN(fake_predictions, False)
 
-            # calculate reconstruction loss
-            recon_loss = self.model.recon_criterion(fake_images, real)
-            lambda_recon = self.model.hparams.lambda_recon
+            loss_L1 = self.criterionL1(fake_images, real_images) * self.hparams.lambda_L1
+            generator_loss = generator_adversarial_loss + loss_L1
 
-            loss = adversarial_loss + lambda_recon * recon_loss
-            self.log('Generator Loss', loss)
-
-        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0 and optimizer_idx == 0:
-            print("Logging images")
-            # pass
-            # fake = self.model.gen(condition).detach()  # TODO: change this!
-            self.log_images(condition_t=condition,
-                            real_t=real,
-                            fake_t=fake_images,
-                            epoch=self.current_epoch,
-                            batch_idx=batch_idx,
-                            filename=" ",
-                            phase='train')
-
-        return loss
+            output = {'loss': generator_loss}
+            return output
 
     def validation_step(self, batch, batch_idx):
 
-        real, condition, _ = batch
-
-        fake_images = self.model.gen(condition).detach()
-        fake_logits = self.model.patch_gan(fake_images, condition)
-
-        real_logits = self.model.patch_gan(real, condition)
-
-        fake_loss = self.model.adversarial_criterion(fake_logits, torch.zeros_like(fake_logits))
-        real_loss = self.model.adversarial_criterion(real_logits, torch.ones_like(real_logits))
-
-        val_loss = (real_loss + fake_loss) / 2
+        real_images, conditions = batch
+        fake_images = self.model.generator(conditions).detach()
 
         if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 100 == 0:
-            self.log_images(condition_t=condition,
-                            real_t=real,
-                            fake_t=fake_images,
-                            epoch=self.current_epoch,
-                            batch_idx=batch_idx,
-                            filename=" ",
-                            phase='val')
+            fig, title = log_images(epoch=self.current_epoch,
+                                    batch_idx=batch_idx,
+                                    image_list=[conditions, real_images, fake_images],
+                                    image_name_list=['condition', 'real image', 'fake image'],
+                                    cmap_list=['hot', 'gray', 'gray'],
+                                    filename=[''],
+                                    phase='val')
 
-        print(val_loss)
+            self.logger[0].experiment.add_figure(tag=title, figure=fig)
 
-        return val_loss
-
-    def test_step(self, batch, batch_idx):
-
-        # self.model.set_eval()
-
-        real, condition, filenames = batch
-
-        fake = self.model.gen(condition).detach()  # TODO: change this!
-        # self.log_images(condition_t=condition,
-        #                 real_t=real,
-        #                 fake_t=fake,
-        #                 epoch=self.current_epoch,
-        #                 batch_idx=batch_idx,
-        #                 filename=" ",
-        #                 phase='test')
-
-        self.save_test_image(fake, filenames, self.hparams.output_path)
-
-        return 0
-
-    @staticmethod
-    def image_with_colorbar(fig, ax, image, cmap=None, title=""):
-
-        if cmap is None:
-            pos0 = ax.imshow(image)
-        else:
-            pos0 = ax.imshow(image, cmap=cmap)
-        ax.set_axis_off()
-        ax.set_title(title)
-        divider = make_axes_locatable(ax)
-        cax0 = divider.append_axes("right", size="5%", pad=0.05)
-        tick_list = np.linspace(np.min(image), np.max(image), 5)
-        cbar0 = fig.colorbar(pos0, cax=cax0, ticks=tick_list, fraction=0.001, pad=0.05)
-        cbar0.ax.set_yticklabels(["{:.2f}".format(item) for item in tick_list])  # vertically oriented colorbar
-
-    @staticmethod
-    def save_test_image(fake_images, filenames, savepath):
-
-        images = np.squeeze(fake_images.to("cpu").numpy(), axis=1)
-
-        batch_size = images.shape[0]
-        for i in range(batch_size):
-            filename = filenames[i] + ".png"
-            image = np.squeeze(images[i])
-
-            cropped_image = image[0: -9, 24:-24]
-
-            cropped_image = cropped_image + np.min(cropped_image)
-            cropped_image = cropped_image/np.max(cropped_image) * 255
-            cropped_image = cropped_image.astype(np.uint8)
-
-            image_filepath = os.path.join(savepath, filename)
-
-            im = Image.fromarray(cropped_image)
-            im.save(image_filepath)
-
-    def log_images(self, condition_t, real_t, fake_t, epoch, batch_idx, filename=" ", phase=''):
-
-        if phase == 'train':
-            name = f'Train Epoch: {epoch}, Batch: {batch_idx}, filename: {filename[0]}'
-
-        elif phase == 'val':
-            name = f'Val Epoch: {epoch}, Batch: {batch_idx}, filename: {filename[0]}'
-
-        elif phase == 'test':
-            name = f'Test Epoch: {epoch}, Batch: {batch_idx}, filename: {filename[0]}'
-
-        else:
-            name = f'Unknown Phase Epoch: {epoch}, Batch: {batch_idx}, filename: {filename[0]}'
-
-        condition = np.squeeze(condition_t.to("cpu").numpy()[0, :, :, :])
-        real = np.squeeze(real_t.to("cpu").numpy()[0, :, :, :])
-        fake = np.squeeze(fake_t.to("cpu").numpy()[0, :, :, :])
-
-        fig, axs = plt.subplots(1, 3)
-
-        if real.shape[0] == 3:
-            self.image_with_colorbar(fig, axs[0], np.rollaxis(condition, 0, 3), title='Condition')
-            self.image_with_colorbar(fig, axs[1], np.rollaxis(real, 0, 3), cmap='gray', title='Real')
-            self.image_with_colorbar(fig, axs[2], np.rollaxis(fake, 0, 3), cmap='gray', title='Fake')
-        else:
-            self.image_with_colorbar(fig, axs[0], np.squeeze(condition), title='Condition')
-            self.image_with_colorbar(fig, axs[1], np.squeeze(real), cmap='gray', title='Real')
-            self.image_with_colorbar(fig, axs[2], np.squeeze(fake), cmap='gray', title='Fake')
-        fig.suptitle(name, fontsize=16)
-
-        fig.tight_layout()
-        self.logger[0].experiment.add_figure(tag=name, figure=fig)
+        return {'val_loss': -1}
 
     @staticmethod
     def add_module_specific_args(parser):
         module_specific_args = get_argparser_group(title='Dataset options', parser=parser)
+        module_specific_args.add_argument('--gan_mode', default='vanilla', type=str)
+        module_specific_args.add_argument('--beta1', default=0.5, type=float)
+        module_specific_args.add_argument('--lambda_L1', default=50.0, type=float)  # was 100
 
         return parser
