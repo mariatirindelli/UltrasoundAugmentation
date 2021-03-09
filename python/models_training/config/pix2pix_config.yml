@@ -1,5 +1,5 @@
 module : gan_image_generation.GanImageGeneration
-dataset : FacadesDataset.PairedDataset
+dataset : PairedPixelwiseDb.PairedDataset
 model : pix2pix.Pix2PixModel
 data_root : datasets/bones
 output_path : ./results

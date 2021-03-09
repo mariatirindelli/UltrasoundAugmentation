@@ -19,3 +19,4 @@ python/models_training/datasets/bones/
 python/models_training/datasets/facades/
 pytorch-CycleGAN-and-pix2pix-master/pytorch-CycleGAN-and-pix2pix-master/.gitignore
 pytorch-CycleGAN-and-pix2pix-master/
+python/models_training/tests/test_data/
