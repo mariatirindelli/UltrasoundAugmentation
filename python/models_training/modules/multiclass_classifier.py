@@ -21,6 +21,7 @@ class MultiClassClassification(LightningModule):
         self.hparams = hparams
         self.model = model
         self.example_input_array = torch.zeros(self.hparams.batch_size, self.hparams.input_channels, 256, 256)
+        self.example_input_array = torch.zeros(self.hparams.batch_size, 1, 256, 256)
         self.accuracy = Accuracy()
 
         self.logger = logger[0] if logger is not None else None  # setting the tensorboard logger
