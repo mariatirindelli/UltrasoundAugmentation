@@ -12,6 +12,7 @@ from us_augmentation import *
 import math
 from torchvision.datasets import DatasetFolder
 import pathlib
+import random
 
 # dyndata returns a dict with keys
 # (['image': image, 'label': label, 'filename': self.data_list[idx], 'weights':pos_weights])
@@ -58,7 +59,8 @@ class BoneClassificationDb(pl.LightningDataModule):
                                                              deformation_prob=0,
                                                              m_reflection_prob=0,
                                                              noise_prob=0,
-                                                             classical_prob=0)
+                                                             classical_prob=0,
+                                                             erasing_prob=0)
             elif self.hparams.augmentation_mode == 'tilting':
                 self.data[split] = BoneClassificationDataset(root_dir=self.hparams.data_root,
                                                              split=split,
@@ -67,7 +69,8 @@ class BoneClassificationDb(pl.LightningDataModule):
                                                              deformation_prob=0,
                                                              m_reflection_prob=0,
                                                              noise_prob=0,
-                                                             classical_prob=0)
+                                                             classical_prob=0,
+                                                             erasing_prob=0)
             elif self.hparams.augmentation_mode == 'deformation':
                 self.data[split] = BoneClassificationDataset(root_dir=self.hparams.data_root,
                                                              split=split,
@@ -76,7 +79,8 @@ class BoneClassificationDb(pl.LightningDataModule):
                                                              deformation_prob=self.hparams.deformation_prob,
                                                              m_reflection_prob=0,
                                                              noise_prob=0,
-                                                             classical_prob=0)
+                                                             classical_prob=0,
+                                                             erasing_prob=0)
             elif self.hparams.augmentation_mode == 'm_reflection':
                 self.data[split] = BoneClassificationDataset(root_dir=self.hparams.data_root,
                                                              split=split,
@@ -85,7 +89,8 @@ class BoneClassificationDb(pl.LightningDataModule):
                                                              deformation_prob=0,
                                                              m_reflection_prob=self.hparams.m_reflection_prob,
                                                              noise_prob=0,
-                                                             classical_prob=0)
+                                                             classical_prob=0,
+                                                             erasing_prob=0)
             elif self.hparams.augmentation_mode == 'noise':
                 self.data[split] = BoneClassificationDataset(root_dir=self.hparams.data_root,
                                                              split=split,
@@ -94,16 +99,19 @@ class BoneClassificationDb(pl.LightningDataModule):
                                                              deformation_prob=0,
                                                              m_reflection_prob=0,
                                                              noise_prob=self.hparams.noise_prob,
-                                                             classical_prob=0)
+                                                             classical_prob=0,
+                                                             erasing_prob=0)
             elif self.hparams.augmentation_mode == 'all':
                 self.data[split] = BoneClassificationDataset(root_dir=self.hparams.data_root,
                                                              split=split,
                                                              augmentation_prob=1,
-                                                             tilting_prob=self.hparams.tilting_prob,
+                                                             tilting_prob=0,
                                                              deformation_prob=self.hparams.deformation_prob,
                                                              m_reflection_prob=self.hparams.m_reflection_prob,
                                                              noise_prob=self.hparams.noise_prob,
-                                                             classical_prob=0)
+                                                             classical_prob=0.3,
+                                                             classical_augmentation=True,
+                                                             erasing_prob=0)
             elif self.hparams.augmentation_mode == 'classical':
                 self.data[split] = BoneClassificationDataset(root_dir=self.hparams.data_root,
                                                              split=split,
@@ -113,7 +121,18 @@ class BoneClassificationDb(pl.LightningDataModule):
                                                              m_reflection_prob=0,
                                                              noise_prob=0,
                                                              classical_prob=self.hparams.classical_prob,
-                                                             classical_augmentation=True)
+                                                             classical_augmentation=True,
+                                                             erasing_prob=0.0)
+            elif self.hparams.augmentation_mode == 'erasing':
+                self.data[split] = BoneClassificationDataset(root_dir=self.hparams.data_root,
+                                                             split=split,
+                                                             augmentation_prob=0,
+                                                             tilting_prob=0,
+                                                             deformation_prob=0,
+                                                             m_reflection_prob=0,
+                                                             noise_prob=0,
+                                                             classical_prob=0,
+                                                             erasing_prob=self.hparams.erasing_prob)
 
     def __dataloader(self, split=None):
         dataset = self.data[split]
@@ -164,6 +183,7 @@ class BoneClassificationDb(pl.LightningDataModule):
         mnist_specific_args.add_argument('--deformation_prob', default=0.5, type=float)
         mnist_specific_args.add_argument('--m_reflection_prob', default=0.5, type=float)
         mnist_specific_args.add_argument('--noise_prob', default=0.5, type=float)
+        mnist_specific_args.add_argument('--erasing_prob', default=0.5, type=float)
         mnist_specific_args.add_argument('--classical_prob', default=0.5, type=float)
         mnist_specific_args.add_argument('--augmentation_mode', default='none', type=str)
 
@@ -176,7 +196,7 @@ class BoneClassificationDataset(Dataset):
     """SpinousProcessClassificationDataset dataset."""
 
     def __init__(self, root_dir, split, augmentation_prob=0.5, tilting_prob=0, deformation_prob=0, m_reflection_prob=0,
-                 noise_prob=0, classical_prob=0, classical_augmentation=False):
+                 noise_prob=0, classical_prob=0, erasing_prob=0, classical_augmentation=False):
         self.split = split
         self.root_dir = os.path.join(root_dir, split)
 
@@ -194,12 +214,13 @@ class BoneClassificationDataset(Dataset):
         self.deformation_prob = deformation_prob
         self.m_reflection_prob = m_reflection_prob
         self.noise_prob = noise_prob
+        self.erasing_prob = erasing_prob
         self.classical_prob = classical_prob
         self.classical_augmentation = classical_augmentation
 
         self.transform = transforms.ToTensor()  # converts to tensor and normalize between 0 and 1
 
-        self.classsical_transform = transforms.Compose([  # transforms.RandomVerticalFlip(p=0.3),
+        self.classical_transform = transforms.Compose([  # transforms.RandomVerticalFlip(p=0.3),
                                                  transforms.RandomHorizontalFlip(p=0.3),
                                                  transforms.RandomAffine(degrees=10,
                                                                          translate=[0.2,0.2]),
@@ -239,7 +260,10 @@ class BoneClassificationDataset(Dataset):
         image = self.transform(image)
 
         if self.split != "test" and self.classical_prob:
-            image = self.classsical_transform(image)
+            image = self.classical_transform(image)
+
+        if self.split != "test" and self.erasing_prob:
+            image, augmentation_string = self.apply_random_erasing_augmentation(image=image)
 
         sample = {'image': image.float(),
                   'label': label,
@@ -254,6 +278,36 @@ class BoneClassificationDataset(Dataset):
         zeros = label.size - non_zeros
         pos_weights = zeros / non_zeros
         return pos_weights
+
+    def apply_random_erasing_augmentation(self, image):
+
+        augmentation_string = ''
+        if random.random() <= self.erasing_prob:
+            sl = 0.02  # sl: min erasing area
+            sh = 0.4   # sh: max erasing area
+            r1 = 0.3   # r1: min aspect ratio
+            mean = [0.4914, 0.4822, 0.4465]     # mean: erasing value
+
+            area = image.size()[1] * image.size()[2]
+            target_area = random.uniform(sl, sh) * area
+            aspect_ratio = random.uniform(r1, 1 /r1)
+
+            h = int(round(math.sqrt(target_area * aspect_ratio)))
+            w = int(round(math.sqrt(target_area / aspect_ratio)))
+
+            if w < image.size()[2] and h < image.size()[1]:
+                x1 = random.randint(0, image.size()[1] - h)
+                y1 = random.randint(0, image.size()[2] - w)
+                if image.size()[0] == 3:
+                    image[0, x1:x1+h, y1:y1+w] = mean[0]
+                    image[1, x1:x1+h, y1:y1+w] = mean[1]
+                    image[2, x1:x1+h, y1:y1+w] = mean[2]
+                else:
+                    image[0, x1:x1+h, y1:y1+w] = mean[0]
+                return image, ''
+            augmentation_string += ' - random erasing'
+
+        return image, augmentation_string
 
     def apply_random_augmentation(self, image, img_label, filename):
 

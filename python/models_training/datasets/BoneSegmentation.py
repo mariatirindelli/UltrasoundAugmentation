@@ -105,11 +105,12 @@ class BoneSegmentationDb(pl.LightningDataModule):
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
                                                            augmentation_prob=1,
-                                                           tilting_prob=self.hparams.tilting_prob,
+                                                           tilting_prob=0,
                                                            deformation_prob=self.hparams.deformation_prob,
                                                            m_reflection_prob=self.hparams.m_reflection_prob,
                                                            noise_prob=self.hparams.noise_prob,
-                                                           classical_prob=0)
+                                                           classical_prob=0,
+                                                           classical_augmentation=False)
             elif self.hparams.augmentation_mode == 'classical':
                 self.data[split] = BoneSegmentationDataset(root_dir=self.hparams.data_root,
                                                            split=split,
@@ -181,7 +182,7 @@ class BoneSegmentationDataset(Dataset):
     """BoneSegmentationDataset dataset."""
 
     def __init__(self, root_dir, split, augmentation_prob=0.5, tilting_prob=0, deformation_prob=0, m_reflection_prob=0,
-                 noise_prob=0, classical_prob=0.0, classical_augmentation=False, pix2pix_augmentation=False):
+                 noise_prob=0, classical_prob=0.0, erasing_prob=0.0, classical_augmentation=False, pix2pix_augmentation=False):
         self.split = split
         self.root_dir = os.path.join(root_dir, split)
         self.data_list = os.listdir(os.path.join(self.root_dir, "images"))
@@ -197,6 +198,7 @@ class BoneSegmentationDataset(Dataset):
         self.deformation_prob = deformation_prob
         self.m_reflection_prob = m_reflection_prob
         self.noise_prob = noise_prob
+        self.erasing_prob = erasing_prob
         self.classical_prob = classical_prob
         self.classical_augmentation = classical_augmentation
 
@@ -299,7 +301,7 @@ class BoneSegmentationDataset(Dataset):
 
         augmentation_parameters = ""
         if np.random.uniform(low=0.0, high=1.0) <= self.deformation_prob:
-            displacement = int(np.random.uniform(30, 100))
+            displacement = int(np.random.uniform(50, 150))
             augmentation_parameters += "displ_{}".format(displacement)
             try:
                 image, label = self.deformation.execute(image, label, displacement=displacement)
@@ -317,7 +319,7 @@ class BoneSegmentationDataset(Dataset):
                 augmentation_parameters += "Failed"
 
         if np.random.uniform(low=0.0, high=1.0) <= self.m_reflection_prob:
-            reflection_intensity = np.random.uniform(0.50, 0.90)
+            reflection_intensity = np.random.uniform(0.70, 1.0)
             augmentation_parameters += "-mreflection_{}".format(reflection_intensity)
             try:
                 image, label = self.multiple_reflection.execute(image, label,
@@ -334,8 +336,8 @@ class BoneSegmentationDataset(Dataset):
             local_energy_name = path.parts[-1].split(".")[0] + "_local_energy.mat"
             local_energy_path = os.path.join(root, "local_energy", local_energy_name)
 
-            bone_signal = np.random.uniform(0.70, 1.40)
-            bg_signal = np.random.uniform(0.70, 1.40)
+            bone_signal = np.random.uniform(0.60, 1.40)
+            bg_signal = np.random.uniform(0.60, 1.40)
             augmentation_parameters += "-noise_{}_{}".format(bone_signal, bg_signal)
             try:
                 image, label = self.noise.execute(image, label, local_energy_path=local_energy_path, bone_signal=bone_signal,
