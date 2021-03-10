@@ -48,22 +48,87 @@ def dice_score(gt, pred):
     dice = numerator / denominator
     return dice
 
-def hausdorff_score(gt, pred):
-    gt_coordinates = np.argwhere(gt > 0)
-    pred_coordinates = np.argwhere(pred > 0)
+def get_label_pred_couples(label_c, pred_c):
 
-    hd = max(directed_hausdorff(gt_coordinates, pred_coordinates)[0], directed_hausdorff(pred_coordinates, gt_coordinates)[0])
-    return hd
+    distance_matrix = np.zeros([len(label_c), len(pred_c)])
+    for row, label_centroid in enumerate(label_c):
+        for col, pred_centroid in enumerate(pred_c):
+            distance_matrix[row, col] = \
+                np.sqrt((label_centroid[0] - pred_centroid[0])**2 + (label_centroid[1] - pred_centroid[1])**2)
+
+    couples_list = []
+
+    for _ in range(len(pred_c)):
+
+        min_idx = np.argmin(distance_matrix)
+        best_couple = np.unravel_index(min_idx, shape=distance_matrix.shape)
+
+        if distance_matrix[best_couple[0], best_couple[1]] == 100000:
+
+            return couples_list
+
+        couples_list.append( [best_couple[0] + 1, best_couple[1] + 1] )   # label id, pred id
+
+        distance_matrix[best_couple[0], :] = 100000
+        distance_matrix[:, best_couple[1]] = 100000
+
+    return couples_list  # label id, pred id
+
+
+def hausdorff_score(gt, pred):
+    _, gt_connected_components = cv2.connectedComponents(gt.astype(np.uint8))
+    _, pred_connected_components = cv2.connectedComponents(pred.astype(np.uint8))
+
+    if np.sum(pred) == 0:
+        #print("returning none")
+        return None
+
+    # getting connected components centroids
+    pred_centroids = [np.mean(np.argwhere(pred_connected_components == i), axis=0) for i in range(1, np.max(pred_connected_components) + 1)]
+    gt_centroids = [np.mean(np.argwhere(gt_connected_components == i), axis=0) for i in
+                    range(1, np.max(gt_connected_components) + 1)]
+    label_pred_couples = get_label_pred_couples(gt_centroids, pred_centroids)
+
+    hd_list = []
+    for item in label_pred_couples:
+        label_connected_component = np.zeros(gt.shape)
+        label_connected_component[gt_connected_components == item[0]] = 1
+
+        pred_connected_component = np.zeros(pred.shape)
+        pred_connected_component[pred_connected_components == item[1]] = 1
+        gt_coordinates = np.argwhere(label_connected_component > 0)
+        pred_coordinates = np.argwhere(pred_connected_component > 0)
+
+        hd = max(directed_hausdorff(gt_coordinates, pred_coordinates)[0],
+                 directed_hausdorff(pred_coordinates, gt_coordinates)[0])
+
+        hd_list.append(hd)
+
+        # if hd > 100:
+        #     plt.subplot(2, 2, 1)
+        #     plt.imshow(label_connected_component)
+        #     plt.subplot(2, 2, 2)
+        #     plt.imshow(pred_connected_component)
+        #
+        #     plt.subplot(2, 2, 3)
+        #     plt.imshow(gt)
+        #     plt.subplot(2, 2, 4)
+        #     plt.imshow(pred)
+        #     plt.show()
+
+
+    return np.mean(hd_list)
 
 
 def evaluate_experiment(root, experiment_id, metric):
 
     # dice metric for each image is already saved in the csv file after testing, no need to re-compute it
+
     if metric == 'dice':
-        if not os.path.exists(os.path.join(root, experiment_id, "test_results.csv")):
+        if not os.path.exists(os.path.join(root, experiment_id, "test_results_rec.csv")):
             return []
-        result_df = pd.read_csv(os.path.join(root, experiment_id, "test_results.csv"))
-        return result_df["dice_scores"]
+        result_df = pd.read_csv(os.path.join(root, experiment_id, "test_results_rec.csv"))
+        return result_df["dice_scores"], []
 
     experiment_path = os.path.join(root, experiment_id)
 
@@ -89,13 +154,16 @@ def evaluate_experiment(root, experiment_id, metric):
         dice_list.append(dice)
 
         hd = hausdorff_score(label, binary_pred)
-        hd_list.append(hd)
+        if hd is not None:
+            hd_list.append(hd)
+        #hd_list.append(-1)
 
+        #print(hd)
         filename_list.append(image_name.replace("_image.npy", ""))
         print("\r Progress: {0:.1f}%".format(i/num_files * 100), end="")
 
-    df = pd.DataFrame({'filenames': filename_list, 'dice_scores':dice_list, 'hd_scores': hd})
-    df.to_csv(os.path.join("D:\\NAS\\output\\1988", experiment_id,  "test_results_rec.csv"))
+    df = pd.DataFrame({'filenames': filename_list, 'dice_scores':dice_list})
+    df.to_csv(os.path.join("E:\\NAS_Maria\\output_chrissi\\2105", experiment_id,  "test_results_rec.csv"))
     print("\n")
     return dice_list, hd_list
 
@@ -125,6 +193,8 @@ def evaluate_group_results(group_path, group_experiments, metric):
         else:
             mean_dice = np.mean(result_dice)
             mean_hd = np.mean(result_hd)
+
+        print("experiment id: {} - dice score {}".format(experiment, mean_dice))
         experiments_result_dice.append(mean_dice)
         experiments_result_hd.append(mean_hd)
 
