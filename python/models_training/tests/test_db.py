@@ -3,7 +3,7 @@ import argparse
 import datasets.PairedPixelwiseDb as dt
 import os
 import numpy as np
-
+import datasets.dataset_utils as dt_utils
 
 class MyTestCase(unittest.TestCase):
 
@@ -25,6 +25,30 @@ class MyTestCase(unittest.TestCase):
         parser.add_argument("--random_split", default='80_10_10', type=str)
         # ...Create your parser as you like...
         return parser
+
+    @staticmethod
+    def are_list_equal(list1, list2):
+        for item in list1:
+            if item not in list2:
+                return False
+
+        for item in list2:
+            if item not in list1:
+                return False
+
+        return True
+
+    def _get_expected_file_lists(self, root_folder):
+        expected_train_db = os.listdir(os.path.join(self.root, 'folder_db', 'train'))
+        expected_train_db = [os.path.join(root_folder, item) for item in expected_train_db if "label" not in item]
+
+        expected_val_db = os.listdir(os.path.join(self.root, 'folder_db', 'val'))
+        expected_val_db = [os.path.join(root_folder, item) for item in expected_val_db if "label" not in item]
+
+        expected_test_db = os.listdir(os.path.join(self.root, 'folder_db', 'test'))
+        expected_test_db = [os.path.join(root_folder, item) for item in expected_test_db if "label" not in item]
+
+        return expected_train_db, expected_val_db, expected_test_db
 
     def setUp(self):
         self.parser = self._create_parser()
@@ -49,11 +73,7 @@ class MyTestCase(unittest.TestCase):
                             split=split,
                             data_structure='folder_based')
 
-        for item in method.AB_paths:
-            self.assertTrue(item in expected_output)
-
-        for item in expected_output:
-            self.assertTrue(item in method.AB_paths)
+        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
     def test_BoneDb_folder_split_val(self):
         """
@@ -73,11 +93,7 @@ class MyTestCase(unittest.TestCase):
                             split=split,
                             data_structure='folder_based')
 
-        for item in method.AB_paths:
-            self.assertTrue(item in expected_output)
-
-        for item in expected_output:
-            self.assertTrue(item in method.AB_paths)
+        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
     def test_BoneDb_folder_split_test(self):
         """
@@ -97,11 +113,7 @@ class MyTestCase(unittest.TestCase):
                             split=split,
                             data_structure='folder_based')
 
-        for item in method.AB_paths:
-            self.assertTrue(item in expected_output)
-
-        for item in expected_output:
-            self.assertTrue(item in method.AB_paths)
+        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
     def test_BoneDb_subject_split_train(self):
         """
@@ -112,7 +124,6 @@ class MyTestCase(unittest.TestCase):
 
         root_folder = os.path.join(self.root, 'subject_db')
         train_subject_ids = ["2", "4", "5", "6", "8", "9", "10", "12", "13", "15", "16", "18"]
-        val_subject_ids = ["14", "17", "11", "7"]
         split = 'train'
         input_params = self.parser.parse_args(['--data_root', root_folder])
 
@@ -123,11 +134,7 @@ class MyTestCase(unittest.TestCase):
                             data_structure='subject_based',
                             subject_list=train_subject_ids)
 
-        for item in method.AB_paths:
-            self.assertTrue(item in expected_output)
-
-        for item in expected_output:
-            self.assertTrue(item in method.AB_paths)
+        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
     def test_BoneDb_subject_split_val(self):
         """
@@ -148,11 +155,7 @@ class MyTestCase(unittest.TestCase):
                             data_structure='subject_based',
                             subject_list=val_subject_ids)
 
-        for item in method.AB_paths:
-            self.assertTrue(item in expected_output)
-
-        for item in expected_output:
-            self.assertTrue(item in method.AB_paths)
+        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
     def test_BoneDb_subject_split_test(self):
         """
@@ -173,13 +176,9 @@ class MyTestCase(unittest.TestCase):
                             data_structure='subject_based',
                             subject_list=test_subject_ids)
 
-        for item in method.AB_paths:
-            self.assertTrue(item in expected_output)
+        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
-        for item in expected_output:
-            self.assertTrue(item in method.AB_paths)
-
-    def test_SubjectSplitdDb(self):
+    def test_SubjectSplitdDb_allSetGiven(self):
         """
         Testing BoneDb implementation with folder_db, train split
         Returns:
@@ -197,27 +196,130 @@ class MyTestCase(unittest.TestCase):
                                                '--val_subjects', val_subject_ids,
                                                '--test_subjects', test_subject_ids])
 
-        expected_train_db = os.listdir(os.path.join(self.root, 'folder_db', 'train'))
-        expected_train_db = [os.path.join(root_folder, item) for item in expected_train_db if "label" not in item]
-
-        expected_val_db = os.listdir(os.path.join(self.root, 'folder_db', 'val'))
-        expected_val_db = [os.path.join(root_folder, item) for item in expected_val_db if "label" not in item]
-
-        expected_test_db = os.listdir(os.path.join(self.root, 'folder_db', 'test'))
-        expected_test_db = [os.path.join(root_folder, item) for item in expected_test_db if "label" not in item]
+        expected_train_db, expected_val_db, expected_test_db = self._get_expected_file_lists(root_folder)
 
         method = dt.SubjectSplitdDb(hparams=input_params)
         method.prepare_data()
 
         for split, expected_output in zip(['train', 'val', 'test'],
-                                          [expected_train_db, expected_val_db, expected_test_db] ):
+                                          [expected_train_db, expected_val_db, expected_test_db]):
 
-            for item in method.data[split].AB_paths:
-                self.assertTrue(item in expected_output)
+            self.assertTrue(self.are_list_equal(method.data[split].AB_paths, expected_output))
 
-            for item in expected_output:
-                self.assertTrue(item in method.data[split].AB_paths)
+    def test_SubjectSplitdDb_testValGiven(self):
+        """
+        Testing BoneDb implementation with folder_db, train split
+        Returns:
+        """
+        self.setUp()
 
+        root_folder = os.path.join(self.root, 'subject_db')
+
+        val_subject_ids = "14, 17, 11, 7"
+        test_subject_ids = "1, 3"
+
+        input_params = self.parser.parse_args(['--data_root', root_folder,
+                                               '--val_subjects', val_subject_ids,
+                                               '--test_subjects', test_subject_ids])
+
+        expected_train_db, expected_val_db, expected_test_db = self._get_expected_file_lists(root_folder)
+
+        method = dt.SubjectSplitdDb(hparams=input_params)
+        method.prepare_data()
+
+        for split, expected_output in zip(['train', 'val', 'test'],
+                                          [expected_train_db, expected_val_db, expected_test_db]):
+
+            self.assertTrue(self.are_list_equal(method.data[split].AB_paths, expected_output))
+
+    def test_SubjectSplitdDb_testGiven(self):
+        """
+        Testing BoneDb implementation with folder_db, train split
+        Returns:
+        """
+        self.setUp()
+
+        root_folder = os.path.join(self.root, 'subject_db')
+        test_subject_ids = "1, 3"
+
+        input_params = self.parser.parse_args(['--data_root', root_folder,
+                                               '--test_subjects', test_subject_ids,
+                                               '--random_split', '80_20'])
+
+        _, _, expected_test_db = self._get_expected_file_lists(root_folder)
+
+        # as we have 16 subjects in the train_val set - training: 80% of 16 = 12.8 = 13 - val = 16 - 13 = 3
+        # 13/16 * 100 - 3/16 * 100%
+        expected_train_percentage = 13/16 * 100
+        expected_val_percentage =  3/16 * 100
+
+        method = dt.SubjectSplitdDb(hparams=input_params)
+        method.prepare_data()
+
+        self.assertTrue(self.are_list_equal(method.data['test'].AB_paths, expected_test_db))
+
+        train_sub = dt_utils.get_subject_ids_from_data(method.data['train'].AB_paths)
+        val_sub = dt_utils.get_subject_ids_from_data(method.data['val'].AB_paths)
+
+        # checking no subject overlap between val and train
+        for item in method.data['val'].AB_paths:
+            self.assertFalse(dt_utils.get_id_from_filename(item) in train_sub)
+            self.assertFalse(dt_utils.get_id_from_filename(item) in test_subject_ids)
+
+        for item in method.data['train'].AB_paths:
+            self.assertFalse(dt_utils.get_id_from_filename(item) in val_sub)
+            self.assertFalse(dt_utils.get_id_from_filename(item) in test_subject_ids)
+
+        val_percentage = len(val_sub) / (len(val_sub) + len(train_sub)) * 100
+        train_percentage = len(train_sub) / (len(val_sub) + len(train_sub)) * 100
+
+        self.assertTrue(expected_val_percentage == val_percentage)
+        self.assertTrue(expected_train_percentage == train_percentage)
+
+    def test_SubjectSplitdDb_noTestGiven(self):
+        """
+        Testing BoneDb implementation with folder_db, train split
+        Returns:
+        """
+        self.setUp()
+
+        root_folder = os.path.join(self.root, 'subject_db')
+
+        input_params = self.parser.parse_args(['--data_root', root_folder,
+                                               '--random_split', '80_10_10'])
+
+        # as we have 18 subjects in the train_val_test set - training: 80% of 18 = 14.4 = 14 - val = 80% of 18 = 1.8 = 2
+        # - test = 18 - 14 - 2 = 2
+        # 14/18 * 100= 77.77% - 2/18 * 100 - 2/18 * 100%
+        expected_train_percentage = 14/18 * 100
+        expected_val_percentage = 2/18 * 100
+        expected_test_percentage = 2/18 * 100
+
+        method = dt.SubjectSplitdDb(hparams=input_params)
+        method.prepare_data()
+
+        train_sub = dt_utils.get_subject_ids_from_data(method.data['train'].AB_paths)
+        val_sub = dt_utils.get_subject_ids_from_data(method.data['val'].AB_paths)
+        test_sub = dt_utils.get_subject_ids_from_data(method.data['test'].AB_paths)
+
+        # checking no subject overlap between val and train
+        for item in method.data['val'].AB_paths:
+            self.assertFalse(dt_utils.get_id_from_filename(item) in train_sub)
+            self.assertFalse(dt_utils.get_id_from_filename(item) in test_sub)
+
+        for item in method.data['train'].AB_paths:
+            self.assertFalse(dt_utils.get_id_from_filename(item) in val_sub)
+            self.assertFalse(dt_utils.get_id_from_filename(item) in test_sub)
+
+        val_percentage = len(val_sub) / (len(val_sub) + len(train_sub) + len(test_sub)) * 100
+        train_percentage = len(train_sub) / (len(val_sub) + len(train_sub) + len(test_sub)) * 100
+        test_percentage = len(test_sub) / (len(val_sub) + len(train_sub) + len(test_sub)) * 100
+
+        print(val_percentage, " ", train_percentage, "  ", test_percentage)
+
+        self.assertTrue(expected_val_percentage == val_percentage)
+        self.assertTrue(expected_train_percentage == train_percentage)
+        self.assertTrue(expected_test_percentage == test_percentage)
 
 
 if __name__ == '__main__':

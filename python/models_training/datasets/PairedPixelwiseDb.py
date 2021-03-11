@@ -1,3 +1,5 @@
+from abc import ABC
+
 from datasets.dataset_utils import *
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
@@ -7,11 +9,14 @@ import pytorch_lightning as pl
 import os
 import numpy as np
 from utils.utils import str2bool
-from abc import ABC
-
+import abc
 # TODO: add description on how it expects the db to be structured
 
-class BaseDbModule(pl.LightningDataModule):
+
+class BaseDbModuleMeta(type(pl.LightningDataModule), type(abc.ABC)):
+    pass
+
+class BaseDbModule(pl.LightningDataModule, abc.ABC, metaclass=BaseDbModuleMeta):
     def __init__(self, hparams):
         super().__init__()
         # self.name = 'MNIST'
@@ -21,6 +26,13 @@ class BaseDbModule(pl.LightningDataModule):
         self.input_channels = self.hparams.input_nc
         self.batch_size = self.hparams.batch_size
         self.data = {}
+
+    def _set_random_splits(self):
+
+        if isinstance(self.hparams.random_split, str):
+            splits = self.hparams.random_split.split("_")
+            splits = [int(item) for item in splits]
+            self.hparams.random_split = splits
 
     def __dataloader(self, split=None):
         dataset = self.data[split]
@@ -48,7 +60,11 @@ class BaseDbModule(pl.LightningDataModule):
         dataloader = self.__dataloader(split='test')
         return dataloader
 
-class FolderSplitdDb(BaseDbModule):
+
+class BasedModuleChildMeta(type(BaseDbModule), type(abc.ABC)):
+    pass
+
+class FolderSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
     def __init__(self, hparams):
         super().__init__(hparams)
@@ -73,61 +89,76 @@ class FolderSplitdDb(BaseDbModule):
 
         return parser
 
-class SubjectSplitdDb(BaseDbModule):
+class SubjectSplitdDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
     def __init__(self, hparams):
         super().__init__(hparams)
 
-    def _get_split_subjects(self, split):
+        self._set_split_subjects()
+        self._set_random_splits()
 
-        if split not in ['train', 'val', 'test']:
-            return []
+    def _set_split_subjects(self):
 
-        split_subjects = getattr(self.hparams, split + '_subjects')
-        subject_list = split_subjects.split(",")
-        subject_list = [item.replace(" ", "") for item in subject_list]
+        for split in ['train', 'val', 'test']:
 
-        return subject_list
+            split_subjects = getattr(self.hparams, split + '_subjects')
+            subject_list = split_subjects.split(",")
+            subject_list = [item.replace(" ", "") for item in subject_list]
+
+            subject_list = [item for item in subject_list if item != "" and item != " "]
+            setattr(self.hparams, split + "_subjects", subject_list)
 
     def prepare_data(self):
 
-        self.hparams.train_subjects = self._get_split_subjects('train')
-        self.hparams.val_subjects = self._get_split_subjects('val')
-        self.hparams.test_subjects = self._get_split_subjects('test')
+        train_given = len(self.hparams.train_subjects) != 0
+        val_given = len(self.hparams.val_subjects) != 0
+        test_given = len(self.hparams.test_subjects) != 0
 
         subject_ids = get_subject_ids_from_data(os.listdir(self.data_root))
 
-        if len(self.hparams.test_subjects) == len(self.hparams.train_subjects) == len(self.hparams.val_subjects) == 0:
+        # if the test is not given either we have a random split with the percentages in self.hparams.random_split or
+        # we assume the test set is empty
+        if not test_given:
+            if not train_given and not val_given:
+                self.hparams.train_subjects, self.hparams.val_subjects, self.hparams.test_subjects = \
+                    get_subject_based_random_split(subject_ids, split_percentage=self.hparams.random_split)
 
-            self.hparams.train_subjects, self.hparams.val_subjects, test_subjects = \
-                get_subject_based_random_split(subject_ids, split_percentage=self.hparams.random_split)
+            elif train_given and val_given:
+                self.hparams.test_subjects = []
 
-        elif len(self.hparams.test_subjects) != 0 and \
-                len(self.hparams.train_subjects) == len(self.hparams.val_subjects) == 0:
+            elif not train_given and val_given:
+                self.hparams.train_subjects = [item for item in subject_ids if item not in self.hparams.val_subjects]
 
-            assert len(self.hparams.random_split) == 3, "If test set is given, random split must contain only two " \
-                                                        "values, one for train and one for validation"
+            elif train_given and not val_given:
+                self.hparams.val_subjects = [item for item in subject_ids if item not in self.hparams.train_subjects]
+
+            else:
+                raise ValueError("Unsupported configuration")
+
+        if test_given:
             subject_ids = [item for item in subject_ids if item not in self.hparams.test_subjects]
-            self.hparams.train_subjects, self.hparams.val_subjects = \
-                get_subject_based_random_split(subject_ids, split_percentage=self.hparams.random_split)
 
-        elif len(self.hparams.test_subjects) != 0 and len(self.hparams.val_subjects) != 0 \
-                and len(self.hparams.train_subjects) == 0:
-            self.hparams.train_subjects = [item for item in subject_ids if
-                                           item not in self.hparams.test_subjects and
-                                           item not in self.hparams.val_subjects]
-            pass
+            if train_given and val_given:
+                pass
 
-        elif len(self.hparams.test_subjects) != 0 and \
-                len(self.hparams.train_subjects) != 0 and len(self.hparams.val_subjects) != 0:
-            pass
+            elif not train_given and not val_given:
+                assert len(self.hparams.random_split) == 2, "If test set is given, random split must contain only" \
+                                                            " two values, one for train and one for validation"
+                self.hparams.train_subjects, self.hparams.val_subjects, _ = \
+                    get_subject_based_random_split(subject_ids, split_percentage=self.hparams.random_split)
 
-        else:
-            raise ValueError("If test set is given, train and val sets must be either both given or none of them given")
+            elif not train_given and val_given:
+                self.hparams.train_subjects = [item for item in subject_ids if item not in self.hparams.val_subjects]
 
-        for subject_list, split in \
-                zip([self.hparams.train_subjects, self.hparams.val_subjects, self.hparams.test_subjects],
-                    ['train', 'val', 'test']):
+            elif train_given and not val_given:
+                self.hparams.val_subjects = [item for item in subject_ids if item not in self.hparams.train_subjects]
+
+            else:
+                raise ValueError("Unsupported configuration")
+
+        for subject_list, split in zip(
+                [self.hparams.train_subjects, self.hparams.val_subjects, self.hparams.test_subjects],
+                ['train', 'val', 'test']):
 
             self.data[split] = USBones(hparams=self.hparams,
                                        subject_list=subject_list,
@@ -152,6 +183,54 @@ class SubjectSplitdDb(BaseDbModule):
 
         return parser
 
+class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
+    def __init__(self, hparams):
+        super().__init__(hparams)
+        self._set_random_splits()
+
+    def prepare_data(self):
+
+        data_list = sorted(make_dataset(self.data_root, self.hparams.max_dataset_size))  # get image paths
+        data_list = [item for item in data_list if "label" not in item]
+        dataset_size = len(data_list)
+
+        if self.hparams.test_folder != '':
+
+            test_data_list = sorted(make_dataset(self.hparams.test_folder, self.hparams.max_dataset_size))
+            test_data_list = [item for item in test_data_list if "label" not in item]
+
+            n_training_samples = round(self.hparams.random_split[0] * dataset_size)
+            train_data_list = random.sample(data_list, n_training_samples)
+
+            val_data_list = [item for item in data_list if item not in train_data_list]
+
+        else:
+            n_training_samples = round(self.hparams.random_split[0] * dataset_size)
+            train_data_list = random.sample(data_list, n_training_samples)
+
+            n_val_samples = round(self.hparams.random_split[1] * dataset_size)
+            val_data_list = random.sample(data_list, n_val_samples)
+
+            test_data_list = [item for item in data_list if item not in train_data_list and item not in val_data_list]
+
+        for split, data_list in zip(['train', 'val', 'test'], [train_data_list, val_data_list, test_data_list]):
+            self.data[split] = USBones(self.hparams, data_list=data_list)
+
+    @staticmethod
+    def add_dataset_specific_args(parser):
+        """
+        Parameters you define here will be available to your model through self.hparams
+        :param parser:
+        """
+        dataset_specific_args = get_argparser_group(title='Dataset options', parser=parser)
+        dataset_specific_args.add_argument('--preprocess', default='resize_and_crop', type=str)
+        dataset_specific_args.add_argument('--load_size', default=256, type=int)
+        dataset_specific_args.add_argument('--crop_size', default=256, type=int)
+        dataset_specific_args.add_argument('--max_dataset_size', default=np.inf, type=float)
+        dataset_specific_args.add_argument("--test_folder", default='', type=str)
+        dataset_specific_args.add_argument("--random_split", default='80_10_10', type=str)
+        return parser
+
 class BaseDataset(Dataset):
     def __init__(self, hparams, split=None, subject_list=None, data_list=None, data_structure='folder_based'):
 
@@ -162,15 +241,15 @@ class BaseDataset(Dataset):
         self.input_nc = 1
         self.output_nc = 1
 
+        if data_list is not None:
+            self.AB_paths = data_list
+            return
+
         if data_structure == 'folder_based':
             assert isinstance(split, str), "Split must be a string - usually train, test or val"
             self.dir_AB = os.path.join(hparams.data_root, split)
         else:
             self.dir_AB = hparams.data_root
-
-        if data_list is not None:
-            self.dir_AB = data_list
-            return
 
         self.AB_paths = sorted(make_dataset(self.dir_AB, self.hparams.max_dataset_size))  # get image paths
         self.AB_paths = [item for item in self.AB_paths if "label" not in item]

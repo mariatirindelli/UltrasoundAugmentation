@@ -131,7 +131,7 @@ def get_id_from_filename(filename):
     return sub_id
 
 
-def get_subject_based_random_split(subject_ids, split_percentage="80_10_10"):
+def get_subject_based_random_split(subject_ids, split_percentage=(80, 10, 10)):
     """
     Considering an input data_list where the data are saved as subjectId_imageId.fmt, it generates train and validation
     folders with a subject based split in a random way
@@ -142,19 +142,22 @@ def get_subject_based_random_split(subject_ids, split_percentage="80_10_10"):
     Returns:
     """
 
-    set_percentages = split_percentage.split("_")
-    give_test = len(set_percentages) == 3
-    train_percentage, val_percentage = float(set_percentages[0]) / 100, float(set_percentages[1]) / 100
+    assert sum(split_percentage) == 100, "Only full db subjects usage is supported"
 
-    n_train_subjects = int(train_percentage * len(subject_ids))
+    give_test = len(split_percentage) == 3
+    dataset_size = len(subject_ids)
+
+    train_percentage, val_percentage = float(split_percentage[0]) / 100, float(split_percentage[1]) / 100
+
+    n_train_subjects = round(train_percentage * dataset_size)
     train_subjects = random.sample(subject_ids, n_train_subjects)
 
     if not give_test:
         val_subjects = [item for item in subject_ids if item not in train_subjects]
-        return train_subjects, val_subjects
+        return train_subjects, val_subjects, []
 
     subject_ids = [item for item in subject_ids if item not in train_subjects]
-    n_val_subjects = int(val_percentage * len(subject_ids))
+    n_val_subjects = round(val_percentage * dataset_size)
     val_subjects = random.sample(subject_ids, n_val_subjects)
     test_subjects = [item for item in subject_ids if item not in val_subjects]
 
