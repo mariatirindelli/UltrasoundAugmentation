@@ -89,7 +89,7 @@ class FolderSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
         return parser
 
-class SubjectSplitdDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
+class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
     def __init__(self, hparams):
         super().__init__(hparams)
@@ -107,6 +107,36 @@ class SubjectSplitdDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
             subject_list = [item for item in subject_list if item != "" and item != " "]
             setattr(self.hparams, split + "_subjects", subject_list)
+
+    def log_db_info(self):
+
+        print("\n---------------------------------------------------------------------------------")
+        if len(self.hparams.random_split) == 3:
+            print("Db split: train: {} - val: {} - test: {}".format(self.hparams.random_split[0],
+                                                                    self.hparams.random_split[1],
+                                                                    self.hparams.random_split[2]))
+
+        if len(self.hparams.random_split) == 2:
+            print("Db split: train: {} - val: {} - test: {}".format(self.hparams.random_split[0],
+                                                                    self.hparams.random_split[1],
+                                                                    0))
+
+        for split in ['train', 'val', 'test']:
+
+            subject_list = getattr(self.hparams, split + "_subjects")
+
+            print("Num subjects in {} split: {} - num data: {}".format(split,
+                                                                       len(subject_list),
+                                                                       len(self.data[split].AB_paths) ))
+
+            string_to_plot = "{} split ids : ".format(split)
+
+            for i in subject_list:
+                string_to_plot += "{}, ".format(i)
+
+            print(string_to_plot[0:-2])
+
+        print("---------------------------------------------------------------------------------\n")
 
     def prepare_data(self):
 
@@ -164,6 +194,8 @@ class SubjectSplitdDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
                                        subject_list=subject_list,
                                        data_structure='subject_based')
 
+        self.log_db_info()
+
     @staticmethod
     def add_dataset_specific_args(parser):
         """
@@ -205,16 +237,21 @@ class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
             val_data_list = [item for item in data_list if item not in train_data_list]
 
         else:
-            n_training_samples = round(self.hparams.random_split[0] * dataset_size)
+            n_training_samples = round(self.hparams.random_split[0]/100 * dataset_size)
             train_data_list = random.sample(data_list, n_training_samples)
 
-            n_val_samples = round(self.hparams.random_split[1] * dataset_size)
-            val_data_list = random.sample(data_list, n_val_samples)
+            if len(self.hparams.random_split) == 2:
+                val_data_list = [item for item in data_list if item not in train_data_list]
+                test_data_list = []
 
-            test_data_list = [item for item in data_list if item not in train_data_list and item not in val_data_list]
+            else:
+                n_val_samples = round(self.hparams.random_split[1]/100 * dataset_size)
+                val_data_list = random.sample(data_list, n_val_samples)
+
+                test_data_list = [item for item in data_list if item not in train_data_list and item not in val_data_list]
 
         for split, data_list in zip(['train', 'val', 'test'], [train_data_list, val_data_list, test_data_list]):
-            self.data[split] = USBones(self.hparams, data_list=data_list)
+            self.data[split] = USBones(self.hparams, data_list=data_list, split=split)
 
     @staticmethod
     def add_dataset_specific_args(parser):
@@ -229,6 +266,7 @@ class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
         dataset_specific_args.add_argument('--max_dataset_size', default=np.inf, type=float)
         dataset_specific_args.add_argument("--test_folder", default='', type=str)
         dataset_specific_args.add_argument("--random_split", default='80_10_10', type=str)
+        dataset_specific_args.add_argument("--no_flip", default=True, type=str2bool)
         return parser
 
 class BaseDataset(Dataset):
@@ -275,16 +313,16 @@ class USBones(BaseDataset):
         A_path = self.AB_paths[idx].replace(".png", "_label.png")
         B_path = self.AB_paths[idx]
 
-        A = Image.open(A_path).convert('LA')
-        B = Image.open(B_path).convert('LA')
+        A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None
+        B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None
 
         # apply the same transform to both A and B
         transform_params = get_params(self.hparams, A.size)
         A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
         B_transform = get_transform(self.hparams, transform_params, grayscale=(self.output_nc == 1))
 
-        A = A_transform(A)
-        B = B_transform(B)
+        A = A_transform(A) if A is not None else None
+        B = B_transform(B) if B is not None else None
 
         return B, A  # return image, label
 

@@ -70,3 +70,9 @@ scp D:\NAS\FacadesDataset.zip mariatirindelli@10.23.0.56:/mnt/data/mariatirindel
 ```
 
 scp mariatirindelli@10.23.0.56:/mnt/data/mariatirindelli/output/Pix2Pix/myres.zip D:\NAS
+
+## TO CREATE POLYAXON PROJECT
+```
+polyaxon project create --name CIFAR10_Example
+polyaxon init CIFAR10_Example  --polyaxonfile
+```

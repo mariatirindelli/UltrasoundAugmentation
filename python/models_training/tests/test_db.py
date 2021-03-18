@@ -198,7 +198,7 @@ class MyTestCase(unittest.TestCase):
 
         expected_train_db, expected_val_db, expected_test_db = self._get_expected_file_lists(root_folder)
 
-        method = dt.SubjectSplitdDb(hparams=input_params)
+        method = dt.SubjectSplitDb(hparams=input_params)
         method.prepare_data()
 
         for split, expected_output in zip(['train', 'val', 'test'],
@@ -224,7 +224,7 @@ class MyTestCase(unittest.TestCase):
 
         expected_train_db, expected_val_db, expected_test_db = self._get_expected_file_lists(root_folder)
 
-        method = dt.SubjectSplitdDb(hparams=input_params)
+        method = dt.SubjectSplitDb(hparams=input_params)
         method.prepare_data()
 
         for split, expected_output in zip(['train', 'val', 'test'],
@@ -253,7 +253,7 @@ class MyTestCase(unittest.TestCase):
         expected_train_percentage = 13/16 * 100
         expected_val_percentage =  3/16 * 100
 
-        method = dt.SubjectSplitdDb(hparams=input_params)
+        method = dt.SubjectSplitDb(hparams=input_params)
         method.prepare_data()
 
         self.assertTrue(self.are_list_equal(method.data['test'].AB_paths, expected_test_db))
@@ -295,7 +295,7 @@ class MyTestCase(unittest.TestCase):
         expected_val_percentage = 2/18 * 100
         expected_test_percentage = 2/18 * 100
 
-        method = dt.SubjectSplitdDb(hparams=input_params)
+        method = dt.SubjectSplitDb(hparams=input_params)
         method.prepare_data()
 
         train_sub = dt_utils.get_subject_ids_from_data(method.data['train'].AB_paths)

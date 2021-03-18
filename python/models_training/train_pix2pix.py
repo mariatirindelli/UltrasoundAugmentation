@@ -33,9 +33,8 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
     # ------------------------
     checkpoint_callback = ModelCheckpoint(
         dirpath=f"{hparams.output_path}/checkpoints/",
-        period=100,
+        period=50,  # Interval (number of epochs) between checkpoints.
         verbose=True,
-        save_top_k=-1,
         prefix=hparams.name,
         filename=f'{{epoch}}-{{{hparams.early_stopping_metric}:.2f}}'
     )
@@ -72,7 +71,7 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
         )
         # For the pix2pix network  we process the training data with the GAN as it "belongs" to the training process
         dataset.prepare_data()
-        test_loader = dataset.train_dataloader()
+        test_loader = dataset.test_dataloader()
         trainer.test(ckpt_path=checkpoint_callback.best_model_path, model=module, test_dataloaders=test_loader)
 
     print("test done")

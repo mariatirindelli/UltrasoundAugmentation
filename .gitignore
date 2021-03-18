@@ -20,3 +20,7 @@ python/models_training/datasets/facades/
 pytorch-CycleGAN-and-pix2pix-master/pytorch-CycleGAN-and-pix2pix-master/.gitignore
 pytorch-CycleGAN-and-pix2pix-master/
 python/models_training/tests/test_data/
+python/models_training/datasets/manual_seg/
+python/utils/__pycache__/__init__.cpython-37.pyc
+python/utils/__pycache__/
+python/db_generation_scripts/__pycache__/
