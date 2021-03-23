@@ -4,21 +4,26 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
 from PIL import Image
 
-def image_with_colorbar(fig, ax, image, cmap=None, title=""):
+def image_with_colorbar(fig, ax, image, cmap=None, title="", clim=None):
+
+    if clim is None:
+        clim = (np.min(image), np.max(image))
 
     if cmap is None:
-        pos0 = ax.imshow(image)
+        pos0 = ax.imshow(image, clim=clim)
     else:
-        pos0 = ax.imshow(image, cmap=cmap)
+        pos0 = ax.imshow(image, cmap=cmap, clim=clim)
     ax.set_axis_off()
     ax.set_title(title)
     divider = make_axes_locatable(ax)
     cax0 = divider.append_axes("right", size="5%", pad=0.05)
-    tick_list = np.linspace(np.min(image), np.max(image), 5)
-    cbar0 = fig.colorbar(pos0, cax=cax0, ticks=tick_list, fraction=0.001, pad=0.05)
-    cbar0.ax.set_yticklabels(["{:.2f}".format(item) for item in tick_list])  # vertically oriented colorbar
 
-def log_images(epoch, batch_idx, image_list, image_name_list, cmap_list='gray', filename='', phase=''):
+    tick_list = np.linspace(clim[0], clim[1], 5)
+    tick_labels = ["{:.2f}".format(item) for item in tick_list]
+    cbar0 = fig.colorbar(pos0, cax=cax0, ticks=tick_list, fraction=0.001, pad=0.05)
+    cbar0.ax.set_yticklabels(tick_labels)  # vertically oriented colorbar
+
+def log_images(epoch, batch_idx, image_list, image_name_list, cmap_list='gray', filename='', phase='', clim=None):
     """
     Example:
     image_list = [image_batch, label_batch, prediction_batch]
@@ -37,9 +42,9 @@ def log_images(epoch, batch_idx, image_list, image_name_list, cmap_list='gray', 
         np_image = np.squeeze(image_batch.to("cpu").numpy()[0, :, :, :])
 
         if np_image.shape[0] == 3:
-            image_with_colorbar(fig, ax, np.rollaxis(np_image, 0, 3), cmap=camp, title=image_name)
+            image_with_colorbar(fig, ax, np.rollaxis(np_image, 0, 3), cmap=camp, title=image_name, clim=clim)
         else:
-            image_with_colorbar(fig, ax, np_image, cmap=camp, title=image_name)
+            image_with_colorbar(fig, ax, np_image, cmap=camp, title=image_name, clim=clim)
 
     fig.suptitle(plot_title, fontsize=16)
 

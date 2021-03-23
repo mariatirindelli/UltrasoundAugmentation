@@ -21,3 +21,4 @@ MNIST
 ./datasets/bones
 ./datasets/facades
 ./datasets/manual_seg
+./venv

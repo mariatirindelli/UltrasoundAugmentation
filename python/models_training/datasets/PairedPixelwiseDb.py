@@ -1,7 +1,7 @@
 from abc import ABC
 
 from datasets.dataset_utils import *
-from PIL import Image
+from PIL import Image, ImageFilter
 from torch.utils.data import DataLoader, Dataset
 from utils.utils import get_argparser_group
 from pathlib import Path
@@ -10,6 +10,7 @@ import os
 import numpy as np
 from utils.utils import str2bool
 import abc
+
 # TODO: add description on how it expects the db to be structured
 
 
@@ -93,6 +94,9 @@ class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
     def __init__(self, hparams):
         super().__init__(hparams)
+
+        if hparams.max_dataset_size < 0:
+            hparams.max_dataset_size = np.inf
 
         self._set_split_subjects()
         self._set_random_splits()
@@ -206,7 +210,7 @@ class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
         dataset_specific_args.add_argument('--preprocess', default='resize_and_crop', type=str)
         dataset_specific_args.add_argument('--load_size', default=256, type=int)
         dataset_specific_args.add_argument('--crop_size', default=256, type=int)
-        dataset_specific_args.add_argument('--max_dataset_size', default=np.inf, type=float)
+        dataset_specific_args.add_argument('--max_dataset_size', default=-1, type=float)
         dataset_specific_args.add_argument("--train_subjects", default='', type=str)
         dataset_specific_args.add_argument("--val_subjects", default='', type=str)
         dataset_specific_args.add_argument("--test_subjects", default='', type=str)
@@ -290,7 +294,8 @@ class BaseDataset(Dataset):
             self.dir_AB = hparams.data_root
 
         self.AB_paths = sorted(make_dataset(self.dir_AB, self.hparams.max_dataset_size))  # get image paths
-        self.AB_paths = [item for item in self.AB_paths if "label" not in item]
+
+        self.AB_paths = [item for item in self.AB_paths if "label" not in os.path.split(item)[-1]]
 
         if data_structure == 'subject_based':
             self.AB_paths = get_split_subjects_data(self.AB_paths, subject_list)
@@ -310,11 +315,15 @@ class USBones(BaseDataset):
 
     def __getitem__(self, idx):
         # read a image given a random integer index
-        A_path = self.AB_paths[idx].replace(".png", "_label.png")
-        B_path = self.AB_paths[idx]
+        A_path = self.AB_paths[idx].replace(".png", "_label.png")  # label
+        B_path = self.AB_paths[idx]  # image
+
+        image_name = os.path.split(B_path)[-1].replace(".png", "")
 
         A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None
         B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None
+
+        blur_B = B.filter(ImageFilter.GaussianBlur(radius=5))
 
         # apply the same transform to both A and B
         transform_params = get_params(self.hparams, A.size)
@@ -323,8 +332,9 @@ class USBones(BaseDataset):
 
         A = A_transform(A) if A is not None else None
         B = B_transform(B) if B is not None else None
+        blur_B = B_transform(blur_B) if B is not None else None
 
-        return B, A  # return image, label
+        return B, A, blur_B, image_name  # return image, label, image_name
 
 class FacadesDataset(Dataset):
     def __init__(self, hparams, split):
@@ -355,6 +365,7 @@ class FacadesDataset(Dataset):
         """
         # read a image given a random integer index
         AB_path = self.AB_paths[idx]
+
         AB = Image.open(AB_path).convert('RGB')
         # split AB image into A and B
         w, h = AB.size

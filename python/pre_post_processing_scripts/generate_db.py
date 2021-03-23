@@ -2,10 +2,9 @@ import numpy as np
 from PIL import Image
 from fix_pythonpath import *
 import logging
-from db_generation_utils import prepare_data_list
+from proc_utils import prepare_data_list
 import argparse
 import imfusion
-import matplotlib.pyplot as plt
 imfusion.init()
 
 def get_name_id_dict(subject_name_list, start_sub_id=0):
@@ -58,9 +57,11 @@ def save_db(save_path, imfusion_exported_data_path, start_sub_id=0, rescale_labe
             image_array = np.array(image).astype(np.uint8)
             label_array = np.array(label).astype(np.uint8)
 
+            label_array[label_array > 1] = 255
+
             if rescale_labels:
                 label_array[label_array == 1] = 250
-                label_array[label_array == 0] = 250
+                label_array[label_array == 0] = 100
 
             if np.sum(label_array) == 0:
                 continue

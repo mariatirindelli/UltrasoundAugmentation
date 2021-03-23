@@ -2,6 +2,7 @@
 from pydoc import locate
 import inspect
 import argparse
+import numpy as np
 
 def argparse_summary(arg_list, parser):
     arg_dict = vars(arg_list)
@@ -81,4 +82,21 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def tensor2np_array(input_tensor):
+    np_array_batch = np.squeeze(input_tensor.numpy())
+
+    output_data = []
+    for i in range(np_array_batch.shape[0]):
+        np_array = np.squeeze(np_array_batch[i, ...])
+        output_data.append(np_array)
+
+    return output_data
+
+def save_data(data, filename, fmt='npy'):
+    if fmt == 'npy':
+        np.save(filename + "." + fmt, data)
+
+    # TODO: add save as other image formats
 

@@ -13,7 +13,7 @@ from datetime import datetime
 
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
-
+import os
 
 def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
     """
@@ -33,9 +33,10 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
     # ------------------------
     checkpoint_callback = ModelCheckpoint(
         dirpath=f"{hparams.output_path}/checkpoints/",
-        period=50,  # Interval (number of epochs) between checkpoints.
+        period=30,  # Interval (number of epochs) between checkpoints.
         verbose=True,
         prefix=hparams.name,
+        save_top_k=-1,
         filename=f'{{epoch}}-{{{hparams.early_stopping_metric}:.2f}}'
     )
 
@@ -54,7 +55,7 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
         auto_lr_find=True,
         auto_scale_batch_size=True,
         #limit_train_batches=0.1,  # use 0.2 for Polyaxon, use 0.03 to avoid memory error on Anna's computer
-        #limit_val_batches=0.01,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
+        #limit_val_batches=0.1,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
     )
     # ------------------------
     # 4 START TRAINING
@@ -62,6 +63,10 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
 
     if not hparams.test_only:
         trainer.fit(module, dataset)
+
+        if len(dataset.test_dataloader()) == 0:
+            print("No test data available")
+            return
         trainer.test()
     else:
         print(
@@ -70,9 +75,18 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
             f"\nTesting..."
         )
         # For the pix2pix network  we process the training data with the GAN as it "belongs" to the training process
+
+        print("resuming checkpoint from: {}".format(hparams.resume_from_checkpoint))
         dataset.prepare_data()
         test_loader = dataset.test_dataloader()
-        trainer.test(ckpt_path=checkpoint_callback.best_model_path, model=module, test_dataloaders=test_loader)
+
+        print("Files in test - {}: {}".format(hparams.data_root, len(os.listdir(hparams.data_root))))
+
+        if len(test_loader) == 0:
+            print("No test data available")
+            return
+
+        trainer.test(ckpt_path=hparams.resume_from_checkpoint, model=module, test_dataloaders=test_loader)
 
     print("test done")
 

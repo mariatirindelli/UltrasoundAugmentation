@@ -32,10 +32,10 @@ num_workers : 6
 ## TO LAUNCH TENSORBOARD ON POLYAXON ############
 
 For group: 
-```polyaxon tensorboard -g <group_id> start -f tensorboard.yaml```
+```polyaxon tensorboard -g <group_id> start -f polyaxon_tensorboard.yaml```
 
 For experiment:
-```polyaxon tensorboard -xp 50846 start -f tensorboard.yaml```
+```polyaxon tensorboard -xp 50846 start -f polyaxon_tensorboard****.yaml```
 
 
 ## LAUNCHING TENSORBOARD ON REMOTE WORKSTATION ##########
