@@ -15,3 +15,11 @@ python/results_evaluation/utils/__pycache__/
 python/remote_debugging/script.sh
 python/models_training/.polyaxon/.polyaxongroup
 python/models_training/.polyaxon/.polyaxonproject
+python/models_training/datasets/bones/
+python/models_training/datasets/facades/
+python/models_training/datasets/manual_seg/
+python/models_training/datasets/test_CT_labels/100_0_0.png
+python/models_training/datasets/test_CT_labels/
+python/models_training/tests/test_data/
+pytorch-CycleGAN-and-pix2pix-master/
+*.pyc
