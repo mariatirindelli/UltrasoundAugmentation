@@ -7,8 +7,6 @@ from utils.utils import tensor2np_array, save_data
 import os
 from utils.utils import str2bool
 from torchgeometry.image.gaussian import gaussian_blur
-import torch.nn as nn
-import math
 
 class GanImageGeneration(pl.LightningModule):
     def __init__(self, hparams, model, logger=None):
@@ -21,7 +19,7 @@ class GanImageGeneration(pl.LightningModule):
         # define loss functions
         self.criterionGAN = networks.GANLoss(hparams.gan_mode).to(self.device)
         self.criterionL1 = torch.nn.L1Loss()
-        self.logger = logger[0] if logger is not None else None
+        self.t_logger = logger if logger is not None else None
 
     def configure_optimizers(self):
 
@@ -67,7 +65,7 @@ class GanImageGeneration(pl.LightningModule):
                                         phase='train',
                                         clim=(-1, 1))
 
-                self.logger[0].experiment.add_figure(tag=title, figure=fig)
+                self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
 
             self.log('Train discriminator loss', discriminator_loss)
 
@@ -114,7 +112,7 @@ class GanImageGeneration(pl.LightningModule):
                                     phase='val',
                                     clim=(-1, 1))
 
-            self.logger[0].experiment.add_figure(tag=title, figure=fig)
+            self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
 
         return {'val_loss': -1}
 
@@ -132,7 +130,7 @@ class GanImageGeneration(pl.LightningModule):
                                 phase='test',
                                 clim=(-1, 1))
 
-        self.logger[0].experiment.add_figure(tag=title, figure=fig)
+        self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
 
         np_conditions = tensor2np_array(conditions.cpu())
         np_fake_images = tensor2np_array(fake_images.cpu())

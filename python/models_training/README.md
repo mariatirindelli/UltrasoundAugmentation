@@ -68,6 +68,9 @@ sed -i -e 's/\r$//' script.sh
 ```
 scp D:\NAS\FacadesDataset.zip mariatirindelli@10.23.0.56:/mnt/data/mariatirindelli
 ```
+scp E:\Chrissi\US_augmentation\public_datasets\BoneClassification.zip tirindellim@campdata.in.tum.de:/home/public_html/files/VertebraeUltrasound
+
+
 
 scp mariatirindelli@10.23.0.56:/mnt/data/mariatirindelli/output/Pix2Pix/myres.zip D:\NAS
 

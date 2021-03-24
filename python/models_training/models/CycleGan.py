@@ -22,7 +22,6 @@ class CycleGan(Module):
         """
         super(CycleGan, self).__init__()
 
-
         self.hparams = hparams
 
         self.gpu_ids = [0]  # TODO change this with config and check with multigpus
@@ -65,28 +64,20 @@ class CycleGan(Module):
                                                  init_gain=self.hparams.init_gain,
                                                  gpu_ids=self.gpu_ids)  # netD_B
 
-    # real_A = condition
-    # real_B = real_image
-    # fake_A = fake_condition
-    # fake_B = fake_image
-    # rec_A = reconstructed_condition
-    # rec_B = reconstructed_image
-    def forward(self, condition, real_image):
+    # real_A = condition, real_B = real_image, fake_A = fake_condition, fake_B = fake_image,
+    # rec_A = reconstructed_condition, rec_B = reconstructed_image
+    def forward(self, real_A, real_B):
         """x = real_A"""
-        fake_image = self.generator_A(condition)  # G_A(A)
-        reconstructed_condition = self.generator_B(fake_image)  # G_B(G_A(A))
+        fake_B = self.generator_A(real_A)  # G_A(A)
+        rec_A = self.generator_B(fake_B)  # G_B(G_A(A))
 
-        fake_condition = self.generator_B(real_image)  # G_B(B)
-        reconstructed_image = self.generator_A(fake_condition)  # G_A(G_B(B))
-        return fake_image, reconstructed_condition, fake_condition, reconstructed_image   # fake_B, rec_A, fake_A, rec_B
+        fake_A = self.generator_B(real_B)  # G_B(B)
+        rec_B = self.generator_A(fake_A)  # G_A(G_B(B))
+        return fake_B, rec_A, fake_A, rec_B
 
     @staticmethod
     def add_model_specific_args(parser):
         module_specific_args = get_argparser_group(title='Dataset options', parser=parser)
-
-        module_specific_args.add_argument('--lambda_A', default=64, type=int)
-        module_specific_args.add_argument('--lambda_B', default=64, type=int)
-        module_specific_args.add_argument('--lambda_identity', default=64, type=int)
 
         module_specific_args.add_argument('--ndf', default=64, type=int)
         module_specific_args.add_argument('--ngf', default=64, type=int)

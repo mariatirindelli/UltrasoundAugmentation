@@ -24,7 +24,7 @@ class BoneSegmentation(pl.LightningModule):
         self.example_input_array = torch.zeros(1, 1, 196, 196)
         self.accuracy = Accuracy()
 
-        self.logger = logger[0] if logger is not None else None  # setting the tensorboard logger
+        self.t_logger = logger[0] if logger is not None else None  # setting the tensorboard logger
         self.counter = 0
         self.dice_loss = DiceLoss()
 
@@ -232,7 +232,7 @@ class BoneSegmentation(pl.LightningModule):
         fig.tight_layout()
 
         fig.suptitle(name, fontsize=16)
-        self.logger[0].experiment.add_figure(tag=name, figure=fig)
+        self.t_logger[0].experiment.add_figure(tag=name, figure=fig)
 
     @staticmethod
     def save_test_image(batch, predictions, savepath):

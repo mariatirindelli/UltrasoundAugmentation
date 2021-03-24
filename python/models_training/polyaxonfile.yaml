@@ -8,11 +8,7 @@ tags: [group]
 hptuning:
   matrix:
     data_root:
-      values: [ /data/RutgersCampProject/RutgersDb/manual_seg,
-                /data/RutgersCampProject/RutgersDb/spine-subjects-new,
-                /data/RutgersCampProject/RutgersDb/spine_test_data_multiple_subjects]
-    L1_blur:
-      values: [False, True]
+      values: [/data/RutgersCampProject/horse2zebra]
 
 build:
   image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
@@ -35,11 +31,10 @@ environment:
       limits: 1
 
 declarations:
-  config_file: config/pix2pix_config.yml
+  config_file: config/cut_config.yml
 
 run:
   cmd:
    - python -u train_pix2pix.py -c={{ config_file }} \
                          --data_root={{ data_root }} \
-                         --L1_blur={{ L1_blur }} \
                          --on_polyaxon

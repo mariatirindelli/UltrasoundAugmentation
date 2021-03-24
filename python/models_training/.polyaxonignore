@@ -21,4 +21,5 @@ MNIST
 ./datasets/bones
 ./datasets/facades
 ./datasets/manual_seg
+./datasets/horse2zebra
 ./venv

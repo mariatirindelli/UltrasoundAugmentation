@@ -1,0 +1,16 @@
+module : cut_image_generation.CUTImageGeneration
+dataset : UnpairedPixelwiseDb.UnpairedFolderSplitDb
+model : CycleGan.CycleGan
+data_root : datasets/horse2zebra
+output_path : ./results
+num_workers : 4
+batch_size : 3
+log_every_n_steps : 10
+learning_rate : 0.0002
+min_epochs : 1
+max_epochs : 200
+input_nc : 1
+output_nc: 1
+gpus : 0
+load_size: 512
+crop_size: 512

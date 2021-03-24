@@ -26,3 +26,4 @@ python/utils/__pycache__/
 python/db_generation_scripts/__pycache__/
 python/models_training/datasets/test_CT_labels/
 *.pyc
+python/models_training/datasets/horse2zebra/
