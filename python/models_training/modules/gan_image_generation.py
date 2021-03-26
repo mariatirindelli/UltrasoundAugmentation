@@ -37,7 +37,7 @@ class GanImageGeneration(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx):
 
-        real_images, conditions, _, _ = batch
+        real_images, conditions, _ = batch
 
         # Discriminator step
         if optimizer_idx == 0:
@@ -99,7 +99,7 @@ class GanImageGeneration(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        real_images, conditions, _, _ = batch
+        real_images, conditions, _ = batch
         fake_images = self.model.generator(conditions).detach()
 
         if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 100 == 0:
@@ -118,7 +118,7 @@ class GanImageGeneration(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
 
-        real_images, conditions, _, filenames = batch
+        real_images, conditions, filenames = batch
         fake_images = self.model.generator(conditions).detach()
 
         fig, title = log_images(epoch=self.current_epoch,

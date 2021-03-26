@@ -323,8 +323,6 @@ class USBones(BaseDataset):
         A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None
         B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None
 
-        blur_B = B.filter(ImageFilter.GaussianBlur(radius=5))
-
         # apply the same transform to both A and B
         transform_params = get_params(self.hparams, A.size)
         A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
@@ -332,9 +330,8 @@ class USBones(BaseDataset):
 
         A = A_transform(A) if A is not None else None
         B = B_transform(B) if B is not None else None
-        blur_B = B_transform(blur_B) if B is not None else None
 
-        return B, A, blur_B, image_name  # return image, label, image_name
+        return B, A, image_name  # return image, label, image_name
 
 class FacadesDataset(Dataset):
     def __init__(self, hparams, split):
