@@ -42,7 +42,7 @@ def log_images(epoch, batch_idx, image_list, image_name_list, cmap_list='gray', 
         np_image = np.squeeze(image_batch.to("cpu").numpy()[0, :, :, :])
 
         if np_image.shape[0] == 3:
-            image_with_colorbar(fig, ax, np.rollaxis(np_image, 0, 3), cmap=camp, title=image_name, clim=clim)
+            image_with_colorbar(fig, ax, np.rollaxis(np_image, 0, 3), cmap=None, title=image_name)
         else:
             image_with_colorbar(fig, ax, np_image, cmap=camp, title=image_name, clim=clim)
 

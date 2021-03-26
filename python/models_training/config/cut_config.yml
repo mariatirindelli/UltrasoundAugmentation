@@ -9,8 +9,8 @@ log_every_n_steps : 10
 learning_rate : 0.0002
 min_epochs : 1
 max_epochs : 200
-input_nc : 1
-output_nc: 1
+input_nc : 3
+output_nc: 3
 gpus : 0
 load_size: 512
 crop_size: 512
