@@ -30,26 +30,36 @@ def log_images(epoch, batch_idx, image_list, image_name_list, cmap_list='gray', 
     label_list = ['input images', 'labels', 'prediction']
     """
 
-    plot_title = f'{phase} Epoch: {epoch}, Batch: {batch_idx}, filename: {filename[0]}'
-
     if isinstance(cmap_list, str):
         cmap_list = [cmap_list for _ in image_list]
 
-    # Only plotting the first image in the batch
-    fig, axs = plt.subplots(1, len(image_list))
+    if isinstance(filename, list):
+        filename = [filename for _ in image_list]
 
-    for image_batch, image_name, camp, ax in zip(image_list, image_name_list, cmap_list, axs):
-        np_image = np.squeeze(image_batch.to("cpu").numpy()[0, :, :, :])
+    batch_size = image_list[0].size(0)
+    fig_list = []
+    title_list = []
 
-        if np_image.shape[0] == 3:
-            image_with_colorbar(fig, ax, np.rollaxis(np_image, 0, 3), cmap=None, title=image_name)
-        else:
-            image_with_colorbar(fig, ax, np_image, cmap=camp, title=image_name, clim=clim)
+    for i in range(batch_size):
 
-    fig.suptitle(plot_title, fontsize=16)
+        fig, axs = plt.subplots(1, len(image_list))
+        plot_title = f'{phase} Epoch: {epoch}, Batch: {batch_idx}, filename: {filename[i]}'
 
-    fig.tight_layout()
-    return fig, plot_title
+        for image_batch, image_name, camp, ax in zip(image_list, image_name_list, cmap_list, axs):
+            np_image = np.squeeze(image_batch.to("cpu").numpy()[i, :, :, :])
+
+            if np_image.shape[0] == 3:
+                image_with_colorbar(fig, ax, np.rollaxis(np_image, 0, 3), cmap=None, title=image_name)
+            else:
+                image_with_colorbar(fig, ax, np_image, cmap=camp, title=image_name, clim=clim)
+
+        fig.suptitle(plot_title, fontsize=16)
+
+        fig.tight_layout()
+        fig_list.append(fig)
+        title_list.append(plot_title)
+
+    return fig_list, title_list
 
 def save_test_image(fake_images, filenames, savepath):
 

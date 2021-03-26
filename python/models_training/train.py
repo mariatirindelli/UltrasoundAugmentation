@@ -3,7 +3,7 @@ from pathlib import Path
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
-from utils.plx_logger import PolyaxonLogger
+from utils.plx_logger import PolyaxonLogger, WandbLogger
 from utils.utils import (
     argparse_summary,
     get_class_by_path,
@@ -160,9 +160,10 @@ if __name__ == "__main__":
         hparams.output_path = Path(hparams.output_path).absolute() / hparams.name
 
     tb_logger = TensorBoardLogger(hparams.output_path, name='tb', log_graph=True)
+    wb_logger = WandbLogger(hparams)
 
     argparse_summary(hparams, parser)
-    loggers = [tb_logger, plx_logger] if hparams.on_polyaxon else [tb_logger]
+    loggers = [tb_logger, plx_logger, wb_logger] if hparams.on_polyaxon else [tb_logger, wb_logger]
 
     # ---------------------
     # RUN TRAINING

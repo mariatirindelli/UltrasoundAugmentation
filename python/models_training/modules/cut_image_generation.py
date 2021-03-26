@@ -131,18 +131,18 @@ class CUTImageGeneration(pl.LightningModule):
         d_opt.step()
 
         if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0:
-            fig, title = log_images(epoch=self.current_epoch,
-                                    batch_idx=batch_idx,
-                                    image_list=[real_A, real_B, fake_B],
-                                    image_name_list=['condition', 'real image', 'fake image'],
-                                    cmap_list=['hot', 'gray', 'gray'],
-                                    filename=[''],
-                                    phase='train',
-                                    clim=(-1, 1))
+            figs, titles = log_images(epoch=self.current_epoch,
+                                      batch_idx=batch_idx,
+                                      image_list=[real_A, real_B, fake_B],
+                                      image_name_list=['condition', 'real image', 'fake image'],
+                                      cmap_list=['hot', 'gray', 'gray'],
+                                      filename=[''],
+                                      phase='train',
+                                      clim=(-1, 1))
 
-            self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
+            self.t_logger[-1].log_image(figs, titles, "Training Results")
 
-        self.log_dict({'g_loss': generator_loss, 'd_loss_A': loss_D_A, 'd_loss_B': loss_D_B})
+        self.t_logger[-1].log_metrics({'g_loss': generator_loss, 'd_loss_A': loss_D_A, 'd_loss_B': loss_D_B})
 
     def save_batch(self, conditions, fake_images, real_images=None, filenames="", fmt='npy'):
         if real_images is None:

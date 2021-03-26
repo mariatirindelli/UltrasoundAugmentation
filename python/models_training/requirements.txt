@@ -15,3 +15,4 @@ torchgeometry==0.1.2
 tqdm==4.51.0
 scikit-image
 python-math
+wandb
