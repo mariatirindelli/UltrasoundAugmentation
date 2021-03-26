@@ -12,8 +12,7 @@ class UnpairedFolderSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
     def prepare_data(self):
 
-        # TODO: change thiiiiiiiiiiiiiiiiis
-        for split in ['train', 'train', 'train']:
+        for split in ['train', 'val', 'test']:
             self.data[split] = UnalignedDataset(self.hparams, split)
 
     @staticmethod
@@ -81,14 +80,18 @@ class UnalignedDataset(Dataset):
         else:   # randomize the index for domain B to avoid fixed pairs.
             index_B = random.randint(0, self.B_size - 1)
         B_path = self.B_paths[index_B]
+
+        A_name = os.path.split(A_path)[-1]
+        B_name = os.path.split(B_path)[-1]
+
         A_img = Image.open(A_path).convert('RGB')
         B_img = Image.open(B_path).convert('RGB')
+
         # apply image transformation
         A = self.transform_A(A_img)
         B = self.transform_B(B_img)
 
-        #return {'A': A, 'B': B, 'A_paths': A_path, 'B_paths': B_path}
-        return A, B, "", ""  # TODO CHANGE THIS
+        return A, B, A_name, B_name
 
     def __len__(self):
         """Return the total number of images in the dataset.
