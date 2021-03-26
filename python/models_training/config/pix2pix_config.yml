@@ -1,10 +1,10 @@
 module : gan_image_generation.GanImageGeneration
-dataset : PairedPixelwiseDb.RandomSplitDb
+dataset : BonePixelwiseDb.SubjectSplitDb
+paired_db: True
 model : pix2pix.Pix2PixModel
 data_root : datasets/bones
-random_split : '80_20'
 output_path : ./results
-num_workers : 0
+num_workers : 4
 batch_size : 3
 log_every_n_steps : 10
 learning_rate : 0.0002
@@ -15,3 +15,4 @@ output_nc: 1
 gpus : 0
 load_size: 512
 crop_size: 512
+group_name: 'Label2US'

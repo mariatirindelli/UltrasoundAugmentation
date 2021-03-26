@@ -23,6 +23,8 @@ class MyTestCase(unittest.TestCase):
         parser.add_argument("--val_subjects", default='', type=str)
         parser.add_argument("--test_subjects", default='', type=str)
         parser.add_argument("--random_split", default='80_10_10', type=str)
+        parser.add_argument("--paired_db", default=True, type=bool)
+
         # ...Create your parser as you like...
         return parser
 
@@ -69,7 +71,7 @@ class MyTestCase(unittest.TestCase):
         expected_output = os.listdir(os.path.join(root_folder, split))
         expected_output = [os.path.join(root_folder, split, item) for item in expected_output if "label" not in item]
 
-        method = dt.USBones(hparams=input_params,
+        method = dt.USBonesPaired(hparams=input_params,
                             split=split,
                             data_structure='folder_based')
 
@@ -89,9 +91,9 @@ class MyTestCase(unittest.TestCase):
         expected_output = os.listdir(os.path.join(root_folder, split))
         expected_output = [os.path.join(root_folder, split, item) for item in expected_output if "label" not in item]
 
-        method = dt.USBones(hparams=input_params,
-                            split=split,
-                            data_structure='folder_based')
+        method = dt.USBonesPaired(hparams=input_params,
+                                  split=split,
+                                  data_structure='folder_based')
 
         self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
@@ -109,9 +111,9 @@ class MyTestCase(unittest.TestCase):
         expected_output = os.listdir(os.path.join(root_folder, split))
         expected_output = [os.path.join(root_folder, split, item) for item in expected_output if "label" not in item]
 
-        method = dt.USBones(hparams=input_params,
-                            split=split,
-                            data_structure='folder_based')
+        method = dt.USBonesPaired(hparams=input_params,
+                                  split=split,
+                                  data_structure='folder_based')
 
         self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
@@ -130,9 +132,9 @@ class MyTestCase(unittest.TestCase):
         expected_output = os.listdir(os.path.join(self.root, 'folder_db', split))
         expected_output = [os.path.join(root_folder, item) for item in expected_output if "label" not in item]
 
-        method = dt.USBones(hparams=input_params,
-                            data_structure='subject_based',
-                            subject_list=train_subject_ids)
+        method = dt.USBonesPaired(hparams=input_params,
+                                  data_structure='subject_based',
+                                  subject_list=train_subject_ids)
 
         self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
@@ -151,9 +153,9 @@ class MyTestCase(unittest.TestCase):
         expected_output = os.listdir(os.path.join(self.root, 'folder_db', split))
         expected_output = [os.path.join(root_folder, item) for item in expected_output if "label" not in item]
 
-        method = dt.USBones(hparams=input_params,
-                            data_structure='subject_based',
-                            subject_list=val_subject_ids)
+        method = dt.USBonesPaired(hparams=input_params,
+                                  data_structure='subject_based',
+                                  subject_list=val_subject_ids)
 
         self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
@@ -172,9 +174,9 @@ class MyTestCase(unittest.TestCase):
         expected_output = os.listdir(os.path.join(self.root, 'folder_db', split))
         expected_output = [os.path.join(root_folder, item) for item in expected_output if "label" not in item]
 
-        method = dt.USBones(hparams=input_params,
-                            data_structure='subject_based',
-                            subject_list=test_subject_ids)
+        method = dt.USBonesPaired(hparams=input_params,
+                                  data_structure='subject_based',
+                                  subject_list=test_subject_ids)
 
         self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
@@ -194,7 +196,8 @@ class MyTestCase(unittest.TestCase):
         input_params = self.parser.parse_args(['--data_root', root_folder,
                                                '--train_subjects', train_subject_ids,
                                                '--val_subjects', val_subject_ids,
-                                               '--test_subjects', test_subject_ids])
+                                               '--test_subjects', test_subject_ids,
+                                               '--paired_db', 'True'])
 
         expected_train_db, expected_val_db, expected_test_db = self._get_expected_file_lists(root_folder)
 
@@ -220,7 +223,8 @@ class MyTestCase(unittest.TestCase):
 
         input_params = self.parser.parse_args(['--data_root', root_folder,
                                                '--val_subjects', val_subject_ids,
-                                               '--test_subjects', test_subject_ids])
+                                               '--test_subjects', test_subject_ids,
+                                               '--paired_db', 'True'])
 
         expected_train_db, expected_val_db, expected_test_db = self._get_expected_file_lists(root_folder)
 
@@ -244,7 +248,8 @@ class MyTestCase(unittest.TestCase):
 
         input_params = self.parser.parse_args(['--data_root', root_folder,
                                                '--test_subjects', test_subject_ids,
-                                               '--random_split', '80_20'])
+                                               '--random_split', '80_20',
+                                               '--paired_db', 'True'])
 
         _, _, expected_test_db = self._get_expected_file_lists(root_folder)
 
@@ -286,7 +291,8 @@ class MyTestCase(unittest.TestCase):
         root_folder = os.path.join(self.root, 'subject_db')
 
         input_params = self.parser.parse_args(['--data_root', root_folder,
-                                               '--random_split', '80_10_10'])
+                                               '--random_split', '80_10_10',
+                                               '--paired_db', 'True'])
 
         # as we have 18 subjects in the train_val_test set - training: 80% of 18 = 14.4 = 14 - val = 80% of 18 = 1.8 = 2
         # - test = 18 - 14 - 2 = 2

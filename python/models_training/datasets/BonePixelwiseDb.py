@@ -1,6 +1,7 @@
 from abc import ABC
 
 from datasets.dataset_utils import *
+from datasets.torch_us_datasets import *
 from PIL import Image, ImageFilter
 from torch.utils.data import DataLoader, Dataset
 from utils.utils import get_argparser_group
@@ -27,6 +28,11 @@ class BaseDbModule(pl.LightningDataModule, abc.ABC, metaclass=BaseDbModuleMeta):
         self.input_channels = self.hparams.input_nc
         self.batch_size = self.hparams.batch_size
         self.data = {}
+
+        if self.hparams.paired_db:
+            self.torch_dataset = USBonesPaired
+        else:
+            self.torch_dataset = USBonesUnpaired
 
     def _set_random_splits(self):
 
@@ -61,20 +67,6 @@ class BaseDbModule(pl.LightningDataModule, abc.ABC, metaclass=BaseDbModuleMeta):
         dataloader = self.__dataloader(split='test')
         return dataloader
 
-
-class BasedModuleChildMeta(type(BaseDbModule), type(abc.ABC)):
-    pass
-
-class FolderSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
-
-    def __init__(self, hparams):
-        super().__init__(hparams)
-
-    def prepare_data(self):
-
-        for split in ['train', 'val', 'test']:
-            self.data[split] = USBones(self.hparams, split, data_structure='folder_based')
-
     @staticmethod
     def add_dataset_specific_args(parser):
         """
@@ -87,8 +79,24 @@ class FolderSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
         dataset_specific_args.add_argument('--crop_size', default=256, type=int)
         dataset_specific_args.add_argument('--max_dataset_size', default=np.inf, type=float)
         dataset_specific_args.add_argument("--no_flip", default=True, type=str2bool)
+        dataset_specific_args.add_argument("--paired_db", default=True, type=str2bool)
+        dataset_specific_args.add_argument("--serial_batches", default=True, type=str2bool)
 
         return parser
+
+
+class BasedModuleChildMeta(type(BaseDbModule), type(abc.ABC)):
+    pass
+
+class FolderSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
+
+    def __init__(self, hparams):
+        super().__init__(hparams)
+
+    def prepare_data(self):
+
+        for split in ['train', 'val', 'test']:
+            self.data[split] = self.torch_dataset(self.hparams, split, data_structure='folder_based')
 
 class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
 
@@ -194,9 +202,9 @@ class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
                 [self.hparams.train_subjects, self.hparams.val_subjects, self.hparams.test_subjects],
                 ['train', 'val', 'test']):
 
-            self.data[split] = USBones(hparams=self.hparams,
-                                       subject_list=subject_list,
-                                       data_structure='subject_based')
+            self.data[split] = self.torch_dataset(hparams=self.hparams,
+                                                  subject_list=subject_list,
+                                                  data_structure='subject_based')
 
         self.log_db_info()
 
@@ -206,16 +214,14 @@ class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
         Parameters you define here will be available to your model through self.hparams
         :param parser:
         """
+
+        parser = BaseDbModule.add_dataset_specific_args(parser)
+
         dataset_specific_args = get_argparser_group(title='Dataset options', parser=parser)
-        dataset_specific_args.add_argument('--preprocess', default='resize_and_crop', type=str)
-        dataset_specific_args.add_argument('--load_size', default=256, type=int)
-        dataset_specific_args.add_argument('--crop_size', default=256, type=int)
-        dataset_specific_args.add_argument('--max_dataset_size', default=-1, type=float)
         dataset_specific_args.add_argument("--train_subjects", default='', type=str)
         dataset_specific_args.add_argument("--val_subjects", default='', type=str)
         dataset_specific_args.add_argument("--test_subjects", default='', type=str)
         dataset_specific_args.add_argument("--random_split", default='80_10_10', type=str)
-        dataset_specific_args.add_argument("--no_flip", default=True, type=str2bool)
 
         return parser
 
@@ -224,16 +230,23 @@ class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
         super().__init__(hparams)
         self._set_random_splits()
 
-    def prepare_data(self):
+    @staticmethod
+    def _filter_list(data_list, keep):
 
+        if keep == "images":
+            return [item for item in data_list if "label" not in item]
+        elif keep == "labels":
+            return [item for item in data_list if "label" in item]
+
+    def _get_splits_for_data(self, extract="images"):
         data_list = sorted(make_dataset(self.data_root, self.hparams.max_dataset_size))  # get image paths
-        data_list = [item for item in data_list if "label" not in item]
+        data_list = self._filter_list(data_list, keep=extract)
         dataset_size = len(data_list)
 
         if self.hparams.test_folder != '':
 
             test_data_list = sorted(make_dataset(self.hparams.test_folder, self.hparams.max_dataset_size))
-            test_data_list = [item for item in test_data_list if "label" not in item]
+            test_data_list = self._filter_list(test_data_list, keep=extract)
 
             n_training_samples = round(self.hparams.random_split[0] * dataset_size)
             train_data_list = random.sample(data_list, n_training_samples)
@@ -241,7 +254,7 @@ class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
             val_data_list = [item for item in data_list if item not in train_data_list]
 
         else:
-            n_training_samples = round(self.hparams.random_split[0]/100 * dataset_size)
+            n_training_samples = round(self.hparams.random_split[0] / 100 * dataset_size)
             train_data_list = random.sample(data_list, n_training_samples)
 
             if len(self.hparams.random_split) == 2:
@@ -249,13 +262,29 @@ class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
                 test_data_list = []
 
             else:
-                n_val_samples = round(self.hparams.random_split[1]/100 * dataset_size)
+                n_val_samples = round(self.hparams.random_split[1] / 100 * dataset_size)
                 val_data_list = random.sample(data_list, n_val_samples)
 
-                test_data_list = [item for item in data_list if item not in train_data_list and item not in val_data_list]
+                test_data_list = [item for item in data_list if
+                                  item not in train_data_list and item not in val_data_list]
 
-        for split, data_list in zip(['train', 'val', 'test'], [train_data_list, val_data_list, test_data_list]):
-            self.data[split] = USBones(self.hparams, data_list=data_list, split=split)
+        return [train_data_list, val_data_list, test_data_list]
+
+    def prepare_data(self):
+
+        if self.hparams.paired_db:
+            splits_data_lists = self._get_splits_for_data(extract="images")
+
+        else:
+            splits_data_lists_images = self._get_splits_for_data(extract="images")
+            splits_data_lists_labels = self._get_splits_for_data(extract="labels")
+
+            splits_data_lists = [[splits_data_lists_images[0], splits_data_lists_labels[0]],
+                                 [splits_data_lists_images[1], splits_data_lists_labels[1]],
+                                 [splits_data_lists_images[2], splits_data_lists_labels[2]]]
+
+            for split, data_list in zip(['train', 'val', 'test'], splits_data_lists):
+                self.data[split] = self.torch_dataset(self.hparams, data_list=data_list, split=split)
 
     @staticmethod
     def add_dataset_specific_args(parser):
@@ -263,121 +292,9 @@ class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
         Parameters you define here will be available to your model through self.hparams
         :param parser:
         """
+        parser = BaseDbModule.add_dataset_specific_args(parser)
         dataset_specific_args = get_argparser_group(title='Dataset options', parser=parser)
-        dataset_specific_args.add_argument('--preprocess', default='resize_and_crop', type=str)
-        dataset_specific_args.add_argument('--load_size', default=256, type=int)
-        dataset_specific_args.add_argument('--crop_size', default=256, type=int)
-        dataset_specific_args.add_argument('--max_dataset_size', default=np.inf, type=float)
         dataset_specific_args.add_argument("--test_folder", default='', type=str)
         dataset_specific_args.add_argument("--random_split", default='80_10_10', type=str)
-        dataset_specific_args.add_argument("--no_flip", default=True, type=str2bool)
+
         return parser
-
-class BaseDataset(Dataset):
-    def __init__(self, hparams, split=None, subject_list=None, data_list=None, data_structure='folder_based'):
-
-        if split is None and subject_list is None:
-            raise ValueError("Either split or subject list must be not None")
-
-        self.hparams = hparams
-        self.input_nc = 1
-        self.output_nc = 1
-
-        if data_list is not None:
-            self.AB_paths = data_list
-            return
-
-        if data_structure == 'folder_based':
-            assert isinstance(split, str), "Split must be a string - usually train, test or val"
-            self.dir_AB = os.path.join(hparams.data_root, split)
-        else:
-            self.dir_AB = hparams.data_root
-
-        self.AB_paths = sorted(make_dataset(self.dir_AB, self.hparams.max_dataset_size))  # get image paths
-
-        self.AB_paths = [item for item in self.AB_paths if "label" not in os.path.split(item)[-1]]
-
-        if data_structure == 'subject_based':
-            self.AB_paths = get_split_subjects_data(self.AB_paths, subject_list)
-
-        assert (self.hparams.load_size >= self.hparams.crop_size)
-
-    def __len__(self):
-        """Return the total number of images in the dataset."""
-        return len(self.AB_paths)
-
-    def __getitem__(self, idx):
-        raise NotImplementedError
-
-class USBones(BaseDataset):
-    def __init__(self, hparams, split=None, subject_list=None, data_list=None, data_structure='folder_based'):
-        super().__init__(hparams, split, subject_list, data_list, data_structure)
-
-    def __getitem__(self, idx):
-        # read a image given a random integer index
-        A_path = self.AB_paths[idx].replace(".png", "_label.png")  # label
-        B_path = self.AB_paths[idx]  # image
-
-        image_name = os.path.split(B_path)[-1].replace(".png", "")
-
-        A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None
-        B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None
-
-        # apply the same transform to both A and B
-        transform_params = get_params(self.hparams, A.size)
-        A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
-        B_transform = get_transform(self.hparams, transform_params, grayscale=(self.output_nc == 1))
-
-        A = A_transform(A) if A is not None else None
-        B = B_transform(B) if B is not None else None
-
-        return B, A, image_name  # return image, label, image_name
-
-class FacadesDataset(Dataset):
-    def __init__(self, hparams, split):
-        self.hparams = hparams
-        self.root = hparams.data_root
-        self.dir_AB = os.path.join(hparams.data_root, split)  # get the image directory
-        self.AB_paths = sorted(make_dataset(self.dir_AB, self.hparams.max_dataset_size))  # get image paths
-        assert (self.hparams.load_size >= self.hparams.crop_size)  # crop_size should be smaller than the size of loaded image
-        self.input_nc = 1
-        self.output_nc = 1
-
-    def __len__(self):
-        """Return the total number of images in the dataset."""
-        return len(self.AB_paths)
-
-    def __getitem__(self, idx):
-
-        """Return a data point and its metadata information.
-
-        Parameters:
-            index - - a random integer for data indexing
-
-        Returns a dictionary that contains A, B, A_paths and B_paths
-            A (tensor) - - an image in the input domain
-            B (tensor) - - its corresponding image in the target domain
-            A_paths (str) - - image paths
-            B_paths (str) - - image paths (same as A_paths)
-        """
-        # read a image given a random integer index
-        AB_path = self.AB_paths[idx]
-
-        AB = Image.open(AB_path).convert('RGB')
-        # split AB image into A and B
-        w, h = AB.size
-        w2 = int(w / 2)
-        A = AB.crop((0, 0, w2, h))
-        B = AB.crop((w2, 0, w, h))
-
-        # apply the same transform to both A and B
-        transform_params = get_params(self.hparams, A.size)
-        A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
-        B_transform = get_transform(self.hparams, transform_params, grayscale=(self.output_nc == 1))
-
-        A = A_transform(A)
-        B = B_transform(B)
-
-        return A, B
-
-

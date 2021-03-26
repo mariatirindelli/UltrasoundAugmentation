@@ -1,35 +1,55 @@
-from utils.utils import get_argparser_group
-from torch.utils.data import Dataset
 from datasets.dataset_utils import *
-from datasets.PairedPixelwiseDb import BaseDbModule, BasedModuleChildMeta
-from abc import ABC
-from utils.utils import str2bool
+from PIL import Image
+from torch.utils.data import Dataset
+import os
 
-class UnpairedFolderSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
+class FacadesDataset(Dataset):
+    def __init__(self, hparams, split):
+        self.hparams = hparams
+        self.root = hparams.data_root
+        self.dir_AB = os.path.join(hparams.data_root, split)  # get the image directory
+        self.AB_paths = sorted(make_dataset(self.dir_AB, self.hparams.max_dataset_size))  # get image paths
+        assert (self.hparams.load_size >= self.hparams.crop_size)  # crop_size should be smaller than the size of loaded image
+        self.input_nc = 1
+        self.output_nc = 1
 
-    def __init__(self, hparams):
-        super().__init__(hparams)
+    def __len__(self):
+        """Return the total number of images in the dataset."""
+        return len(self.AB_paths)
 
-    def prepare_data(self):
+    def __getitem__(self, idx):
 
-        for split in ['train', 'val', 'test']:
-            self.data[split] = UnalignedDataset(self.hparams, split)
+        """Return a data point and its metadata information.
 
-    @staticmethod
-    def add_dataset_specific_args(parser):
+        Parameters:
+            index - - a random integer for data indexing
+
+        Returns a dictionary that contains A, B, A_paths and B_paths
+            A (tensor) - - an image in the input domain
+            B (tensor) - - its corresponding image in the target domain
+            A_paths (str) - - image paths
+            B_paths (str) - - image paths (same as A_paths)
         """
-        Parameters you define here will be available to your model through self.hparams
-        :param parser:
-        """
-        dataset_specific_args = get_argparser_group(title='Dataset options', parser=parser)
-        dataset_specific_args.add_argument('--preprocess', default='resize_and_crop', type=str)
-        dataset_specific_args.add_argument('--load_size', default=256, type=int)
-        dataset_specific_args.add_argument('--crop_size', default=256, type=int)
-        dataset_specific_args.add_argument('--max_dataset_size', default=np.inf, type=float)
-        dataset_specific_args.add_argument("--no_flip", default=True, type=str2bool)
-        dataset_specific_args.add_argument("--serial_batches", default=True, type=str2bool)
+        # read a image given a random integer index
+        AB_path = self.AB_paths[idx]
 
-        return parser
+        AB = Image.open(AB_path).convert('RGB')
+        # split AB image into A and B
+        w, h = AB.size
+        w2 = int(w / 2)
+        A = AB.crop((0, 0, w2, h))
+        B = AB.crop((w2, 0, w, h))
+
+        # apply the same transform to both A and B
+        transform_params = get_params(self.hparams, A.size)
+        A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
+        B_transform = get_transform(self.hparams, transform_params, grayscale=(self.output_nc == 1))
+
+        A = A_transform(A)
+        B = B_transform(B)
+
+        return A, B
+
 
 class UnalignedDataset(Dataset):
     """
@@ -100,3 +120,4 @@ class UnalignedDataset(Dataset):
         we take a maximum of
         """
         return max(self.A_size, self.B_size)
+

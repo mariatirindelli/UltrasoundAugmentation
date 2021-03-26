@@ -7,8 +7,9 @@ tags: [group]
 
 hptuning:
   matrix:
-    data_root:
-      values: [/data/RutgersCampProject/horse2zebra]
+    config_file:
+      values: [config/cut_config.yml, config/pix2pix_config.yml]
+
 
 build:
   image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
@@ -32,7 +33,7 @@ environment:
       limits: 1
 
 declarations:
-  config_file: config/cut_config.yml
+  data_root: /data/RutgersCampProject/CampDb/convex_probe
 
 run:
   cmd:

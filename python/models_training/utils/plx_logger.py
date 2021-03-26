@@ -106,7 +106,7 @@ class PolyaxonLogger(BaseLogger):
         """ Polyaxon cannot log images, therefore it returns without doing anything """
         return
 
-
+# TODO: remove hard-coded project name
 class WandbLogger(BaseLogger):
     """Docstring for PolyaxonLogger. """
 
@@ -114,9 +114,9 @@ class WandbLogger(BaseLogger):
         super().__init__(hparams)
 
         if hparams.group_name == "":
-            wandb.init(dir=hparams.output_path)
+            wandb.init(project="US2CT", dir=hparams.output_path)
         else:
-            wandb.init(group=hparams.group_name, job_type="train", dir=hparams.output_path)
+            wandb.init(project="US2CT", group=hparams.group_name, job_type="train", dir=hparams.output_path)
 
         self._config = wandb.config
 

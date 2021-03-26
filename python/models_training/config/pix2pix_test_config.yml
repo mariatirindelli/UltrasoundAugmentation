@@ -1,5 +1,5 @@
 module : gan_image_generation.GanImageGeneration
-dataset : PairedPixelwiseDb.SubjectSplitDb
+dataset : BonePixelwiseDb.SubjectSplitDb
 model : pix2pix.Pix2PixModel
 data_root : datasets/test_CT_labels
 output_path : ./results

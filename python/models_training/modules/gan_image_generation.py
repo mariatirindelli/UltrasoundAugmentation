@@ -55,17 +55,19 @@ class GanImageGeneration(pl.LightningModule):
 
             discriminator_loss = (discriminator_loss_real + discriminator_loss_fake) * 0.5
 
-            if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0:
-                fig, title = log_images(epoch=self.current_epoch,
-                                        batch_idx=batch_idx,
-                                        image_list=[conditions, real_images, fake_images],
-                                        image_name_list=['condition', 'real image', 'fake image'],
-                                        cmap_list=['hot', 'gray', 'gray'],
-                                        filename=[''],
-                                        phase='train',
-                                        clim=(-1, 1))
+            if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 50 == 0:
+                figs, titles = log_images(epoch=self.current_epoch,
+                                          batch_idx=batch_idx,
+                                          image_list=[conditions, real_images, fake_images],
+                                          image_name_list=['condition', 'real image', 'fake image'],
+                                          cmap_list=['hot', 'gray', 'gray'],
+                                          filename=[''],
+                                          phase='train',
+                                          clim=(-1, 1))
 
-                self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
+                self.t_logger[-1].log_image(figs, titles, "Training Results")
+
+                # self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
 
             self.log('Train discriminator loss', discriminator_loss)
 
@@ -102,17 +104,17 @@ class GanImageGeneration(pl.LightningModule):
         real_images, conditions, _ = batch
         fake_images = self.model.generator(conditions).detach()
 
-        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 100 == 0:
-            fig, title = log_images(epoch=self.current_epoch,
-                                    batch_idx=batch_idx,
-                                    image_list=[conditions, real_images, fake_images],
-                                    image_name_list=['condition', 'real image', 'fake image'],
-                                    cmap_list=['hot', 'gray', 'gray'],
-                                    filename=[''],
-                                    phase='val',
-                                    clim=(-1, 1))
+        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 30 == 0:
+            figs, titles = log_images(epoch=self.current_epoch,
+                                      batch_idx=batch_idx,
+                                      image_list=[conditions, real_images, fake_images],
+                                      image_name_list=['condition', 'real image', 'fake image'],
+                                      cmap_list=['hot', 'gray', 'gray'],
+                                      filename=[''],
+                                      phase='train',
+                                      clim=(-1, 1))
 
-            self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
+            self.t_logger[-1].log_image(figs, titles, "Validation Results")
 
         return {'val_loss': -1}
 
@@ -121,16 +123,17 @@ class GanImageGeneration(pl.LightningModule):
         real_images, conditions, filenames = batch
         fake_images = self.model.generator(conditions).detach()
 
-        fig, title = log_images(epoch=self.current_epoch,
-                                batch_idx=batch_idx,
-                                image_list=[conditions, real_images, fake_images],
-                                image_name_list=['condition', 'real image', 'fake image'],
-                                cmap_list=['hot', 'gray', 'gray'],
-                                filename=[''],
-                                phase='test',
-                                clim=(-1, 1))
+        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0:
+            figs, titles = log_images(epoch=self.current_epoch,
+                                      batch_idx=batch_idx,
+                                      image_list=[conditions, real_images, fake_images],
+                                      image_name_list=['condition', 'real image', 'fake image'],
+                                      cmap_list=['hot', 'gray', 'gray'],
+                                      filename=[''],
+                                      phase='train',
+                                      clim=(-1, 1))
 
-        self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
+            self.t_logger[-1].log_image(figs, titles, "Test Results")
 
         np_conditions = tensor2np_array(conditions.cpu())
         np_fake_images = tensor2np_array(fake_images.cpu())
