@@ -28,3 +28,4 @@ python/models_training/datasets/test_CT_labels/
 *.pyc
 python/models_training/datasets/horse2zebra/
 python/models_training/results/
+python/models_training/datasets/mixed_db/

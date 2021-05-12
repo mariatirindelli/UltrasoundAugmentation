@@ -2,6 +2,7 @@ import pandas as pd
 import os
 import numpy as np
 import argparse
+import random
 
 def prepare_data_list(input_db_path, output_save_path, logger):
 

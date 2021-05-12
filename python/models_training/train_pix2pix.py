@@ -36,7 +36,7 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
         period=30,  # Interval (number of epochs) between checkpoints.
         verbose=True,
         prefix=hparams.name,
-        save_top_k=0,
+        save_top_k=-1,  # if set to -1 all models are saved every <period> epochs
         filename=f'{{epoch}}-{{{hparams.early_stopping_metric}:.2f}}'
     )
 

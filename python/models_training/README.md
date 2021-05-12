@@ -78,6 +78,9 @@ scp mariatirindelli@10.23.0.56:/mnt/data/mariatirindelli/output/Pix2Pix/myres.zi
 ```
 polyaxon project create --name CIFAR10_Example
 polyaxon init CIFAR10_Example  --polyaxonfile
+
+## PORT SPECIFIC TUNNEL SSH
+ssh -L18097:localhost:8097 mariatirindelli@nevarro.ifl
 ```
 
 

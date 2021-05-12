@@ -1,8 +1,6 @@
 from abc import ABC
 
-from datasets.dataset_utils import *
 from datasets.torch_us_datasets import *
-from PIL import Image, ImageFilter
 from torch.utils.data import DataLoader, Dataset
 from utils.utils import get_argparser_group
 from pathlib import Path
@@ -163,7 +161,7 @@ class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
         if not test_given:
             if not train_given and not val_given:
                 self.hparams.train_subjects, self.hparams.val_subjects, self.hparams.test_subjects = \
-                    get_subject_based_random_split(subject_ids, split_percentage=self.hparams.random_split)
+                    get_subject_based_random_split(subject_ids, split_percentages=self.hparams.random_split)
 
             elif train_given and val_given:
                 self.hparams.test_subjects = []
@@ -187,7 +185,7 @@ class SubjectSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
                 assert len(self.hparams.random_split) == 2, "If test set is given, random split must contain only" \
                                                             " two values, one for train and one for validation"
                 self.hparams.train_subjects, self.hparams.val_subjects, _ = \
-                    get_subject_based_random_split(subject_ids, split_percentage=self.hparams.random_split)
+                    get_subject_based_random_split(subject_ids, split_percentages=self.hparams.random_split)
 
             elif not train_given and val_given:
                 self.hparams.train_subjects = [item for item in subject_ids if item not in self.hparams.val_subjects]
@@ -283,8 +281,8 @@ class RandomSplitDb(BaseDbModule, ABC, metaclass=BasedModuleChildMeta):
                                  [splits_data_lists_images[1], splits_data_lists_labels[1]],
                                  [splits_data_lists_images[2], splits_data_lists_labels[2]]]
 
-            for split, data_list in zip(['train', 'val', 'test'], splits_data_lists):
-                self.data[split] = self.torch_dataset(self.hparams, data_list=data_list, split=split)
+        for split, data_list in zip(['train', 'val', 'test'], splits_data_lists):
+            self.data[split] = self.torch_dataset(self.hparams, data_list=data_list, split=split)
 
     @staticmethod
     def add_dataset_specific_args(parser):

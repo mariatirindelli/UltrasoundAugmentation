@@ -7,6 +7,8 @@ from utils.utils import tensor2np_array, save_data
 import os
 from utils.utils import str2bool
 from torchgeometry.image.gaussian import gaussian_blur
+import pytorch_ssim
+import wandb
 
 class GanImageGeneration(pl.LightningModule):
     def __init__(self, hparams, model, logger=None):
@@ -19,7 +21,12 @@ class GanImageGeneration(pl.LightningModule):
         # define loss functions
         self.criterionGAN = networks.GANLoss(hparams.gan_mode).to(self.device)
         self.criterionL1 = torch.nn.L1Loss()
+
+        self.val_criterion = pytorch_ssim.SSIM(window_size=11)
+        #self.criterionL1 = pytorch_ssim.SSIM(window_size=11)
         self.t_logger = logger if logger is not None else None
+
+        self.output_dataset = os.path.join(self.hparams.output_path, "output_db")
 
     def configure_optimizers(self):
 
@@ -104,6 +111,9 @@ class GanImageGeneration(pl.LightningModule):
         real_images, conditions, _ = batch
         fake_images = self.model.generator(conditions).detach()
 
+        ssim_val = 1 - 2*self.val_criterion(fake_images, real_images)
+        wandb.log({'Validation Accuracy': ssim_val})
+
         if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 30 == 0:
             figs, titles = log_images(epoch=self.current_epoch,
                                       batch_idx=batch_idx,
@@ -116,9 +126,12 @@ class GanImageGeneration(pl.LightningModule):
 
             self.t_logger[-1].log_image(figs, titles, "Validation Results")
 
-        return {'val_loss': -1}
+        return {'val_loss': ssim_val}
 
     def test_step(self, batch, batch_idx):
+
+        if not os.path.exists(self.output_dataset):
+            os.mkdir(self.output_dataset)
 
         real_images, conditions, filenames = batch
         fake_images = self.model.generator(conditions).detach()
@@ -137,11 +150,13 @@ class GanImageGeneration(pl.LightningModule):
 
         np_conditions = tensor2np_array(conditions.cpu())
         np_fake_images = tensor2np_array(fake_images.cpu())
+        np_real_images = tensor2np_array(real_images.cpu())
 
         self.save_batch(conditions=np_conditions,
                         fake_images=np_fake_images,
+                        real_images=np_real_images,
                         filenames=filenames,
-                        fmt='npy')
+                        fmt='png')
 
         return {'test_loss': -1}
 
@@ -150,9 +165,9 @@ class GanImageGeneration(pl.LightningModule):
             real_images = [None for _ in conditions]
 
         for condition, fake_image, real_images, filename in zip(conditions, fake_images, real_images, filenames):
-            condition_filename = os.path.join(self.hparams.output_path, filename + "_label")
-            real_filename = os.path.join(self.hparams.output_path, filename + "_real")
-            fake_filename = os.path.join(self.hparams.output_path, filename + "_fake")
+            condition_filename = os.path.join(self.output_dataset, filename + "_label")
+            real_filename = os.path.join(self.output_dataset, filename + "_ct")
+            fake_filename = os.path.join(self.output_dataset, filename + "_us")
 
             save_data(condition, condition_filename, fmt=fmt)
             save_data(real_images, real_filename, fmt=fmt)

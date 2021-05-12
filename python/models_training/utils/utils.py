@@ -3,6 +3,7 @@ from pydoc import locate
 import inspect
 import argparse
 import numpy as np
+from PIL import Image
 
 def argparse_summary(arg_list, parser):
     arg_dict = vars(arg_list)
@@ -94,9 +95,20 @@ def tensor2np_array(input_tensor):
 
     return output_data
 
-def save_data(data, filename, fmt='npy'):
+def save_data(data, filename, fmt='npy', is_label=False):
     if fmt == 'npy':
         np.save(filename + "." + fmt, data)
 
-    # TODO: add save as other image formats
+    elif fmt == 'png':
+
+        rescaled_image = data - np.min(data)
+        rescaled_image = rescaled_image / np.max(rescaled_image) * 255
+        rescaled_image = rescaled_image.astype(np.uint8)
+
+        if is_label:
+            rescaled_image = np.where(rescaled_image > 0, 1, 0)
+
+        pil_image = Image.fromarray(rescaled_image)
+        pil_image.save(filename + "." + fmt)
+
 

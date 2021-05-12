@@ -8,8 +8,9 @@ tags: [group]
 hptuning:
   matrix:
     resume_from_checkpoint:
-      values: [/outputs/mariatirindelli/BonesSegmentation/groups/2430/55376/checkpoints/55376_GanImageGeneration_SubjectSplitDb_pix2pix_Pix2PixModel-epoch=149-val_loss=-1.00.ckpt,
-      /outputs/mariatirindelli/BonesSegmentation/groups/2430/55376/checkpoints/55376_GanImageGeneration_SubjectSplitDb_pix2pix_Pix2PixModel-epoch=179-val_loss=-1.00.ckpt]
+      values: [/outputs/mariatirindelli/BonesSegmentation/groups/2765/61104/checkpoints/61104_GanImageGeneration_SubjectSplitDb_pix2pix_Pix2PixModel-epoch=29-val_loss=-1.00.ckpt,
+      /outputs/mariatirindelli/BonesSegmentation/groups/2765/61104/checkpoints/61104_GanImageGeneration_SubjectSplitDb_pix2pix_Pix2PixModel-epoch=59-val_loss=-1.00.ckpt,
+      /outputs/mariatirindelli/BonesSegmentation/groups/2765/61104/checkpoints/61104_GanImageGeneration_SubjectSplitDb_pix2pix_Pix2PixModel-epoch=89-val_loss=-1.00.ckpt]
 
 build:
   image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
@@ -18,6 +19,7 @@ build:
     - apt install -y libgl1-mesa-glx
     - apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev
     - pip install -r requirements.txt
+    - wandb login b79150d26e52618b08c56a9aef76185e04aa8d6c
 
 environment:
   resources:

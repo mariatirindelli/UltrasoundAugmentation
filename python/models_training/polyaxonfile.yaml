@@ -8,7 +8,7 @@ tags: [group]
 hptuning:
   matrix:
     config_file:
-      values: [config/cut_config.yml, config/pix2pix_config.yml]
+      values: [config/pix2pix_config.yml]
 
 
 build:

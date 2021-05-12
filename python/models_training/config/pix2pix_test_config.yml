@@ -1,15 +1,16 @@
 module : gan_image_generation.GanImageGeneration
-dataset : BonePixelwiseDb.SubjectSplitDb
+dataset : BonePixelwiseDb.RandomSplitDb
 model : pix2pix.Pix2PixModel
-data_root : datasets/test_CT_labels
-output_path : ./results
+data_root : D:\NAS\data\CT_cropped
+test_folder : /data/RutgersCampProject/CT_cropped
+output_path : D:\RutgersCampProject\results
 num_workers : 4
 batch_size : 3
 input_nc : 1
 output_nc: 1
 gpus : 0
 test_only: True
-test_subjects: "100"
-random_split : '0_100'
+random_split : '0_0_100'
 load_size: 512
 crop_size: 512
+group_name: 'mixed_db'

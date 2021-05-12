@@ -34,7 +34,7 @@ class BasePairedDataset(Dataset):
             self.dir_AB = hparams.data_root
 
         self.AB_paths = sorted(make_dataset(self.dir_AB, self.hparams.max_dataset_size))  # get image paths
-        self.AB_paths = [item for item in self.AB_paths if "label" not in os.path.split(item)[-1]]
+        self.AB_paths = [item for item in self.AB_paths if "@" not in item and "label" not in os.path.split(item)[-1]]
 
         if data_structure == 'subject_based':
             self.AB_paths = get_split_subjects_data(self.AB_paths, subject_list)
@@ -99,8 +99,11 @@ class USBonesPaired(BasePairedDataset):
 
         image_name = os.path.split(B_path)[-1].replace(".png", "")
 
-        A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None
-        B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None
+        A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None  # condition
+        B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None  # image
+
+        if A is None:
+            print(A_path, "  ", B_path)
 
         # apply the same transform to both A and B
         transform_params = get_params(self.hparams, A.size)

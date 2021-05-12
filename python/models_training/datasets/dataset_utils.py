@@ -131,7 +131,7 @@ def get_id_from_filename(filename):
     return sub_id
 
 
-def get_subject_based_random_split(subject_ids, split_percentage=(80, 10, 10)):
+def get_subject_based_random_split(subject_ids, split_percentages=(80, 10, 10)):
     """
     Considering an input data_list where the data are saved as subjectId_imageId.fmt, it generates train and validation
     folders with a subject based split in a random way
@@ -142,26 +142,28 @@ def get_subject_based_random_split(subject_ids, split_percentage=(80, 10, 10)):
     Returns:
     """
 
-    assert sum(split_percentage) == 100, "Only full db subjects usage is supported"
+    assert sum(split_percentages) == 100, "Only full db subjects usage is supported"
 
-    give_test = len(split_percentage) == 3
+    splits = ['train', 'val', 'test']
+    ordered_splits = np.argsort(split_percentages)
     dataset_size = len(subject_ids)
 
-    train_percentage, val_percentage = float(split_percentage[0]) / 100, float(split_percentage[1]) / 100
+    if len(split_percentages) == 2:
+        split_percentage = (split_percentages[0], split_percentages[1], 0)
 
-    n_train_subjects = round(train_percentage * dataset_size)
-    train_subjects = random.sample(subject_ids, n_train_subjects)
+    split_dict = dict()
+    for i in ordered_splits:
+        split_percentage = float(split_percentages[i]) / 100
+        n_split_subjects = min(round(split_percentage * dataset_size), len(subject_ids))
 
-    if not give_test:
-        val_subjects = [item for item in subject_ids if item not in train_subjects]
-        return train_subjects, val_subjects, []
+        split_subjects = random.sample(subject_ids, n_split_subjects)
+        subject_ids = [item for item in subject_ids if item not in split_subjects]
+        split_dict[splits[i]] = split_subjects
 
-    subject_ids = [item for item in subject_ids if item not in train_subjects]
-    n_val_subjects = round(val_percentage * dataset_size)
-    val_subjects = random.sample(subject_ids, n_val_subjects)
-    test_subjects = [item for item in subject_ids if item not in val_subjects]
+    if len(subject_ids) > 0:
+        split_dict[splits[i]].extend(subject_ids)
 
-    return train_subjects, val_subjects, test_subjects
+    return split_dict['train'], split_dict['val'], split_dict['test']
 
 def get_subject_ids_from_data(full_data_list):
     full_subject_ids = [get_id_from_filename(item) for item in full_data_list]
