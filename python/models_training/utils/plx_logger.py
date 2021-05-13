@@ -105,62 +105,62 @@ class PolyaxonLogger(BaseLogger):
     def log_image(self, image):
         """ Polyaxon cannot log images, therefore it returns without doing anything """
         return
-
-# TODO: remove hard-coded project name
-class WandbLogger(BaseLogger):
-    """Docstring for PolyaxonLogger. """
-
-    def __init__(self, hparams):
-        super().__init__(hparams)
-
-        if hparams.group_name == "":
-            wandb.init(project="US2CT", dir=hparams.output_path)
-        else:
-            wandb.init(project="US2CT", group=hparams.group_name, job_type="train", dir=hparams.output_path)
-
-        self._config = wandb.config
-
-    @rank_zero_only
-    def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
-        """Record metrics.
-        Args:
-            metrics: Dictionary with metric names as keys and measured quantities as values
-            step: Step number at which the metrics should be recorded
-                  Polyaxon currently does not support assigning a specific step.
-        """
-        wandb.log(metrics)
-
-    @rank_zero_only
-    def log_hyperparams(self, params: argparse.Namespace):
-        """Record hyperparameters.
-        Args:
-            params: argparse.Namespace containing the hyperparameters
-        """
-        wandb.config.update(params)
-
-    def log_model(self, model):
-        """ Polyaxon cannot log models, therefore it returns without doing anything """
-        wandb.watch(model)
-
-    def log_image(self, image, titles="", main_title=""):
-        """ Polyaxon cannot log images, therefore it returns without doing anything """
-
-        if not isinstance(image, list):
-            image = [image]
-
-        if not isinstance(titles, list):
-            titles = [titles]
-
-        wandb.log({main_title: [wandb.Image(img, caption=title) for img, title in zip(image, titles)]})
-        return
-
-    @property
-    def name(self) -> str:
-        """Return the experiment name."""
-        return "" #TODO: change this
-
-    @property
-    def version(self) -> Union[int, str]:
-        """Return the experiment version."""
-        return None
-
+#
+# # TODO: remove hard-coded project name
+# class WandbLogger(BaseLogger):
+#     """Docstring for PolyaxonLogger. """
+#
+#     def __init__(self, hparams):
+#         super().__init__(hparams)
+#
+#         if hparams.group_name == "":
+#             wandb.init(project="US2CT", dir=hparams.output_path)
+#         else:
+#             wandb.init(project="US2CT", group=hparams.group_name, job_type="train", dir=hparams.output_path)
+#
+#         self._config = wandb.config
+#
+#     @rank_zero_only
+#     def log_metrics(self, metrics: Dict[str, float], step: Optional[int] = None):
+#         """Record metrics.
+#         Args:
+#             metrics: Dictionary with metric names as keys and measured quantities as values
+#             step: Step number at which the metrics should be recorded
+#                   Polyaxon currently does not support assigning a specific step.
+#         """
+#         wandb.log(metrics)
+#
+#     @rank_zero_only
+#     def log_hyperparams(self, params: argparse.Namespace):
+#         """Record hyperparameters.
+#         Args:
+#             params: argparse.Namespace containing the hyperparameters
+#         """
+#         wandb.config.update(params)
+#
+#     def log_model(self, model):
+#         """ Polyaxon cannot log models, therefore it returns without doing anything """
+#         wandb.watch(model)
+#
+#     def log_image(self, image, titles="", main_title=""):
+#         """ Polyaxon cannot log images, therefore it returns without doing anything """
+#
+#         if not isinstance(image, list):
+#             image = [image]
+#
+#         if not isinstance(titles, list):
+#             titles = [titles]
+#
+#         wandb.log({main_title: [wandb.Image(img, caption=title) for img, title in zip(image, titles)]})
+#         return
+#
+#     @property
+#     def name(self) -> str:
+#         """Return the experiment name."""
+#         return "" #TODO: change this
+#
+#     @property
+#     def version(self) -> Union[int, str]:
+#         """Return the experiment version."""
+#         return None
+#

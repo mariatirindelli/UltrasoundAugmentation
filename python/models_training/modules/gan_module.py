@@ -10,7 +10,7 @@ from torchgeometry.image.gaussian import gaussian_blur
 import pytorch_ssim
 import wandb
 
-class GanImageGeneration(pl.LightningModule):
+class GanModule(pl.LightningModule):
     def __init__(self, hparams, model, logger=None):
 
         super().__init__()
@@ -44,7 +44,8 @@ class GanImageGeneration(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx):
 
-        real_images, conditions, _ = batch
+        real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
+        conditions = batch['Label']
 
         # Discriminator step
         if optimizer_idx == 0:
@@ -108,7 +109,8 @@ class GanImageGeneration(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        real_images, conditions, _ = batch
+        real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
+        conditions = batch['Label']
         fake_images = self.model.generator(conditions).detach()
 
         ssim_val = 1 - 2*self.val_criterion(fake_images, real_images)
@@ -133,7 +135,8 @@ class GanImageGeneration(pl.LightningModule):
         if not os.path.exists(self.output_dataset):
             os.mkdir(self.output_dataset)
 
-        real_images, conditions, filenames = batch
+        real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
+        conditions = batch['Label']
         fake_images = self.model.generator(conditions).detach()
 
         if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0:

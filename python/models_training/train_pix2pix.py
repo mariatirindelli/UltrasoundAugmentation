@@ -1,9 +1,8 @@
 import configargparse
 from pathlib import Path
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
-from utils.plx_logger import PolyaxonLogger, WandbLogger
+from utils.CustomWandbLogger import CustomWandbLogger
 from utils.utils import (
     argparse_summary,
     get_class_by_path,
@@ -14,6 +13,8 @@ from datetime import datetime
 import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 import os
+from polyaxon_client.tracking import Experiment
+from datasets.torch_us_datasets import USBonesPaired
 
 def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
     """
@@ -55,14 +56,15 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
         auto_lr_find=True,
         auto_scale_batch_size=True,
         #limit_train_batches=0.1,  # use 0.2 for Polyaxon, use 0.03 to avoid memory error on Anna's computer
-        #limit_val_batches=0.1,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
+        limit_val_batches=0.1,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
     )
     # ------------------------
     # 4 START TRAINING
     # ------------------------
 
     if not hparams.test_only:
-        trainer.fit(module, dataset)
+        dataset.prepare_data()
+        trainer.fit(module, train_dataloader=dataset.train_dataloader(), val_dataloaders=dataset.val_dataloader())
 
         if len(dataset.test_dataloader()) == 0:
             print("No test data available")
@@ -140,10 +142,10 @@ if __name__ == "__main__":
             + hparams.model.replace(".", "_")
     )
     if hparams.on_polyaxon:
-        plx_logger = PolyaxonLogger(hparams)
-        hparams.output_path = plx_logger.output_path
-        hparams = plx_logger.hparams
-        hparams.name = plx_logger.experiment.experiment_id + "_" + exp_name
+        experiment = Experiment()
+        hparams.output_path = Path(experiment.get_outputs_path())
+        hparams.name = experiment.experiment_id + "_" + exp_name
+
     else:
         date_str = datetime.now().strftime("%y%m%d-%H%M%S_")
         hparams.name = date_str + exp_name
@@ -151,14 +153,12 @@ if __name__ == "__main__":
         if not os.path.exists(hparams.output_path):
             os.mkdir(hparams.output_path)
 
-    tb_logger = TensorBoardLogger(hparams.output_path, name='tb', log_graph=True)
-    wb_logger = WandbLogger(hparams)
-
     argparse_summary(hparams, parser)
-    loggers = [tb_logger, plx_logger, wb_logger] if hparams.on_polyaxon else [tb_logger, wb_logger]
+    # loggers = [tb_logger, plx_logger, wb_logger] if hparams.on_polyaxon else [tb_logger, wb_logger]
+    logger = CustomWandbLogger(hparams)
 
     # ---------------------
     # RUN TRAINING
     # ---------------------
 
-    train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, loggers)
+    train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger)

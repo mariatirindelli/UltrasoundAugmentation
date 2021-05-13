@@ -149,7 +149,7 @@ def get_subject_based_random_split(subject_ids, split_percentages=(80, 10, 10)):
     dataset_size = len(subject_ids)
 
     if len(split_percentages) == 2:
-        split_percentage = (split_percentages[0], split_percentages[1], 0)
+        split_percentages = (split_percentages[0], split_percentages[1], 0)
 
     split_dict = dict()
     for i in ordered_splits:

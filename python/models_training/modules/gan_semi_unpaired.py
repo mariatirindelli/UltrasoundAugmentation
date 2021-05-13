@@ -1,0 +1,219 @@
+import pytorch_lightning as pl
+from utils.utils import get_argparser_group
+import torch
+from models import networks
+from utils.image_logging import log_images
+from utils.utils import tensor2np_array, save_data
+import os
+import pytorch_ssim
+
+
+class GanSemiUnpairedModule(pl.LightningModule):
+    def __init__(self, hparams, model, logger=None):
+
+        super().__init__()
+
+        self.hparams = hparams
+        self.model = model
+
+        # define loss functions
+        self.criterionGAN = networks.GANLoss(hparams.gan_mode).to(self.device)
+        self.criterionL1 = torch.nn.L1Loss()
+        # self.criterionL1 = pytorch_ssim.SSIM(window_size=11)
+
+        self.val_criterion = pytorch_ssim.SSIM(window_size=11)
+
+        self.output_dataset = os.path.join(self.hparams.output_path, "output_db")
+
+    def val_dataloader(self):
+        tmp = self.val_dataloader()
+        return tmp
+
+    def configure_optimizers(self):
+
+        discriminator_optimizer = torch.optim.Adam(self.model.discriminator.parameters(),
+                                                   lr=self.hparams.learning_rate,
+                                                   betas=(self.hparams.beta1, 0.999))
+        generator_optimizer = torch.optim.Adam(self.model.generator.parameters(),
+                                               lr=self.hparams.learning_rate,
+                                               betas=(self.hparams.beta1, 0.999))
+
+        return discriminator_optimizer, generator_optimizer
+
+    def forward(self, x):
+        return self.model.forward(x)
+
+    def _get_discriminator_loss(self, real_images, conditions, fake_images):
+
+        fake_discriminator_input = torch.cat((conditions, fake_images), 1)
+        fake_predictions = self.model.discriminator(fake_discriminator_input)
+        discriminator_loss_fake = self.criterionGAN(fake_predictions, False)
+
+        # Loss on discriminating real images
+        real_discriminator_input = torch.cat((conditions, real_images), 1)
+        real_predictions = self.model.discriminator(real_discriminator_input)
+        discriminator_loss_real = self.criterionGAN(real_predictions, True)
+
+        discriminator_loss = (discriminator_loss_real + discriminator_loss_fake) * 0.5
+        return discriminator_loss
+
+    def _get_generator_adversarial_loss(self, conditions, fake_images):
+        fake_discriminator_input = torch.cat((conditions, fake_images), 1)
+        fake_predictions = self.model.discriminator(fake_discriminator_input)
+        generator_adversarial_loss = self.criterionGAN(fake_predictions, True)
+        return generator_adversarial_loss
+
+    def update_visual_queue(self, image_dict, phase, batch_idx):
+
+        log_every_n_batch = 50 if phase == 'train' else 20
+
+        if self.current_epoch % self.hparams.log_every_n_steps != 0 or batch_idx % log_every_n_batch != 0:
+            return
+
+        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 50 == 0:
+            full_queue = self.logger.update_image_queue(image_dict = image_dict,
+                                                        phase='train',
+                                                        epoch=self.current_epoch)
+            if full_queue:
+                self.logger.log_image_queue(self,
+                                            phase='train',
+                                            title='Training Results',
+                                            images_keys=None)
+
+    def training_step(self, batch_dict, batch_idx, optimizer_idx):
+
+        num_dataset = len(batch_dict.keys())
+
+        # Discriminator step
+        if optimizer_idx == 0:
+
+            discriminator_loss_total = 0
+            for dataloader_idx, dataset_name in enumerate(batch_dict.keys()):
+                real_images = batch_dict[dataset_name]['Image']  # are the US for dataloader_idx = 0, the CT otherwise
+                conditions = batch_dict[dataset_name]['Label']
+
+                fake_images = self.forward(conditions).detach()
+                discriminator_loss = self._get_discriminator_loss(real_images=real_images,
+                                                                  conditions=conditions,
+                                                                  fake_images=fake_images)
+
+                # Loss on discriminating fake images
+
+                self.update_visual_queue({'condition': conditions,
+                                          'real_image': real_images,
+                                          'fake_image': fake_images},
+                                         phase='train',
+                                         batch_idx=batch_idx)
+
+                self.log('Train discriminator loss - ' + str(dataset_name), discriminator_loss)
+                discriminator_loss_total += discriminator_loss
+
+            output = {'loss': discriminator_loss_total / num_dataset}
+            self.log('Train discriminator loss total', discriminator_loss_total / num_dataset)
+            return output
+
+        # Generator step
+        elif optimizer_idx == 1:
+            generator_loss_total = 0
+            for dataloader_idx, dataset_name in enumerate(batch_dict.keys()):
+                real_images = batch_dict[dataset_name]['Image']  # are the US for dataloader_idx = 0, the CT otherwise
+                conditions = batch_dict[dataset_name]['Label']
+                # Pix2Pix has adversarial and a reconstruction loss
+                fake_images = self.forward(conditions)
+                generator_adversarial_loss = self._get_generator_adversarial_loss(conditions=conditions,
+                                                                                  fake_images=fake_images)
+
+                self.log('Train generator adversarial loss- ' + str(dataset_name), generator_adversarial_loss)
+
+                generator_loss_total += generator_adversarial_loss
+
+                if 'US' in dataset_name:
+                    similarity_loss = self.criterionL1(fake_images, real_images) * self.hparams.lambda_L1
+                    generator_loss_total += similarity_loss
+                    self.log('Train generator similarity loss ' + str(dataset_name), similarity_loss)
+
+            output = {'loss': generator_loss_total/num_dataset}
+            self.log('Train generator loss total', generator_loss_total / num_dataset)
+            return output
+
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+
+        real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
+        conditions = batch['Label']
+
+        fake_images = self.model.forward(conditions).detach()
+        self.update_visual_queue({'condition': conditions,
+                                  'real_image': real_images,
+                                  'fake_image': fake_images},
+                                 phase='val')
+
+        if dataloader_idx == 1:  # on the US dataset
+
+            ssim_val = 1 - 2 * self.val_criterion(fake_images, real_images)
+            self.log('Paired Val Accuracy', ssim_val)
+            return {'Paired Val Accuracy': ssim_val}
+
+        else:  # on the CT dataset
+
+            fake_discriminator_input = torch.cat((conditions, fake_images), 1)
+            fake_predictions = self.model.discriminator(fake_discriminator_input)
+            generator_adversarial_loss = self.criterionGAN(fake_predictions, True)
+
+            validation_loss = generator_adversarial_loss
+            self.log('Unpaired Val Loss', validation_loss)
+            return {'Unpaired Val Loss': validation_loss}
+
+
+    def test_step(self, batch, batch_idx):
+
+        if not os.path.exists(self.output_dataset):
+            os.mkdir(self.output_dataset)
+
+        real_images, conditions, filenames = batch
+        fake_images = self.model.generator(conditions).detach()
+
+        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0:
+            figs, titles = log_images(epoch=self.current_epoch,
+                                      batch_idx=batch_idx,
+                                      image_list=[conditions, real_images, fake_images],
+                                      image_name_list=['condition', 'real image', 'fake image'],
+                                      cmap_list=['hot', 'gray', 'gray'],
+                                      filename=[''],
+                                      phase='train',
+                                      clim=(-1, 1))
+
+            self.t_logger[-1].log_image(figs, titles, "Test Results")
+
+        np_conditions = tensor2np_array(conditions.cpu())
+        np_fake_images = tensor2np_array(fake_images.cpu())
+        np_real_images = tensor2np_array(real_images.cpu())
+
+        self.save_batch(conditions=np_conditions,
+                        fake_images=np_fake_images,
+                        real_images=np_real_images,
+                        filenames=filenames,
+                        fmt='png')
+
+        return {'test_loss': -1}
+
+    def save_batch(self, conditions, fake_images, real_images=None, filenames="", fmt='npy'):
+        if real_images is None:
+            real_images = [None for _ in conditions]
+
+        for condition, fake_image, real_images, filename in zip(conditions, fake_images, real_images, filenames):
+            condition_filename = os.path.join(self.output_dataset, filename + "_label")
+            real_filename = os.path.join(self.output_dataset, filename + "_ct")
+            fake_filename = os.path.join(self.output_dataset, filename + "_us")
+
+            save_data(condition, condition_filename, fmt=fmt)
+            save_data(real_images, real_filename, fmt=fmt)
+            save_data(fake_image, fake_filename, fmt=fmt)
+
+    @staticmethod
+    def add_module_specific_args(parser):
+        module_specific_args = get_argparser_group(title='Dataset options', parser=parser)
+        module_specific_args.add_argument('--gan_mode', default='vanilla', type=str)
+        module_specific_args.add_argument('--beta1', default=0.5, type=float)
+        module_specific_args.add_argument('--lambda_L1', default=50.0, type=float)  # was 100
+
+        return parser

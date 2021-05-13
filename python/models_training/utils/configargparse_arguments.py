@@ -67,6 +67,7 @@ def build_configargparser(parser):
     trainer_group.add_argument('--on_polyaxon', action='store_true')
     trainer_group.add_argument('--output_path', type=str, default='logs')
     trainer_group.add_argument('--group_name', type=str, default='')
+    trainer_group.add_argument('--project_name', type=str, default='US2CT')
 
     known_args, _ = parser.parse_known_args()
     return parser, known_args

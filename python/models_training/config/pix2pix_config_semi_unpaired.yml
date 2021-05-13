@@ -1,10 +1,12 @@
-module : gan_module.GanModule
-dataset : BonePixelwiseDb.FolderSplitDb
-db_kind : 'mixed'
+module : gan_semi_unpaired.GanSemiUnpairedModule
+dataset : BonePixelwiseDb.MixedDb
 model : pix2pix.Pix2PixModel
-data_root : D:/NAS/data/Label2US_mixed
+data_root : ./datasets
+train_folders: 'CT_cropped_mask, US_convex'
+val_folders: 'CT_cropped_mask'
+test_folders: 'CT_cropped_mask'
 output_path : ./results
-num_workers : 4
+num_workers : 0
 batch_size : 3
 log_every_n_steps : 10
 learning_rate : 0.0002

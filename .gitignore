@@ -29,3 +29,7 @@ python/models_training/datasets/test_CT_labels/
 python/models_training/datasets/horse2zebra/
 python/models_training/results/
 python/models_training/datasets/mixed_db/
+python/models_training/datasets/CT_cropped_mask/
+python/models_training/datasets/US_convex/
+python/models_training/wandb/run-20210512_132741-39xxkd3v/run-39xxkd3v.wandb
+python/models_training/wandb/

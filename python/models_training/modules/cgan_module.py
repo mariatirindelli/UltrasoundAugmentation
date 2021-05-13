@@ -8,7 +8,7 @@ import os
 import itertools
 from utils.image_pool import ImagePool
 
-class CUTImageGeneration(pl.LightningModule):
+class CGanModule(pl.LightningModule):
     def __init__(self, hparams, model, logger=None):
 
         super().__init__()
@@ -105,7 +105,8 @@ class CUTImageGeneration(pl.LightningModule):
 
         g_opt, d_opt = self.optimizers()
 
-        real_A, real_B, _, _ = batch  # image, label
+        real_A = batch['US']
+        real_B = batch['Label']
 
         # forward
         fake_B, rec_A, fake_A, rec_B = self.forward(real_A, real_B)  # fake_B, rec_A, fake_A, rec_B
@@ -146,7 +147,8 @@ class CUTImageGeneration(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
 
-        real_A, real_B, _, _ = batch  # image, label
+        real_A = batch['US']
+        real_B = batch['Label']
 
         # forward
         fake_B, rec_A, fake_A, rec_B = self.forward(real_A, real_B)  # fake_B, rec_A, fake_A, rec_B

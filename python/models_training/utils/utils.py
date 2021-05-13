@@ -86,7 +86,7 @@ def str2bool(v):
 
 
 def tensor2np_array(input_tensor):
-    np_array_batch = np.squeeze(input_tensor.numpy())
+    np_array_batch = np.squeeze(input_tensor.cpu().numpy())
 
     output_data = []
     for i in range(np_array_batch.shape[0]):
@@ -96,6 +96,10 @@ def tensor2np_array(input_tensor):
     return output_data
 
 def save_data(data, filename, fmt='npy', is_label=False):
+
+    if "." in filename:
+        [filename, fmt] = filename.split(".")
+
     if fmt == 'npy':
         np.save(filename + "." + fmt, data)
 
