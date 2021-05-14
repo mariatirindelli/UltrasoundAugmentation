@@ -26,7 +26,9 @@ class GanModule(pl.LightningModule):
         #self.criterionL1 = pytorch_ssim.SSIM(window_size=11)
         self.t_logger = logger if logger is not None else None
 
-        self.output_dataset = os.path.join(self.hparams.output_path, "output_db")
+        self.output_dataset_path = os.path.join(self.hparams.output_path, "output_db")
+        if not os.path.exists(self.output_dataset_path):
+            os.mkdir(self.output_dataset_path)
 
     def configure_optimizers(self):
 
@@ -42,7 +44,34 @@ class GanModule(pl.LightningModule):
     def forward(self, x):
         return self.model.forward(x)
 
+    def update_visual_queue(self, image_dict, phase, batch_idx):
+
+        log_every_n_batch = 50 if phase == 'train' else 20
+
+        if self.current_epoch % self.hparams.log_every_n_steps != 0 or batch_idx % log_every_n_batch != 0:
+            return
+
+        if phase == 'train':
+            title = 'Training Result'
+        elif phase == 'val':
+            title = 'Validation Result'
+        else:
+            title = 'Result'
+
+        full_queue = self.logger.update_image_queue(image_dict = image_dict,
+                                                    phase=phase,
+                                                    epoch=self.current_epoch)
+        if full_queue:
+            self.logger.log_image_queue(phase=phase,
+                                        title=title,
+                                        images_keys=None)
+
     def training_step(self, batch, batch_idx, optimizer_idx):
+
+        # use only the first dataset here
+        if isinstance(batch, dict):
+            keys = [item for item in batch.keys()]
+            batch = batch[keys[0]]
 
         real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
         conditions = batch['Label']
@@ -63,19 +92,11 @@ class GanModule(pl.LightningModule):
 
             discriminator_loss = (discriminator_loss_real + discriminator_loss_fake) * 0.5
 
-            if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 50 == 0:
-                figs, titles = log_images(epoch=self.current_epoch,
-                                          batch_idx=batch_idx,
-                                          image_list=[conditions, real_images, fake_images],
-                                          image_name_list=['condition', 'real image', 'fake image'],
-                                          cmap_list=['hot', 'gray', 'gray'],
-                                          filename=[''],
-                                          phase='train',
-                                          clim=(-1, 1))
-
-                self.t_logger[-1].log_image(figs, titles, "Training Results")
-
-                # self.t_logger[0].experiment.add_figure(tag=title, figure=fig)
+            self.update_visual_queue({'condition': conditions,
+                                      'real_image': real_images,
+                                      'fake_image': fake_images},
+                                     phase='train',
+                                     batch_idx=batch_idx)
 
             self.log('Train discriminator loss', discriminator_loss)
 
@@ -90,14 +111,7 @@ class GanModule(pl.LightningModule):
             fake_predictions = self.model.discriminator(fake_discriminator_input)
             generator_adversarial_loss = self.criterionGAN(fake_predictions, True)
 
-            if not self.hparams.L1_blur:
-                loss_L1 = self.criterionL1(fake_images, real_images) * self.hparams.lambda_L1
-            else:
-                blur_real = gaussian_blur(real_images, kernel_size=(23, 23), sigma=(6, 6))
-                blur_fake = gaussian_blur(fake_images, kernel_size=(23, 23), sigma=(6, 6))
-
-                loss_L1 = self.criterionL1(blur_fake, blur_real) * self.hparams.lambda_L1
-
+            loss_L1 = self.criterionL1(fake_images, real_images) * self.hparams.lambda_L1
             generator_loss = generator_adversarial_loss + loss_L1
 
             self.log('Train generator loss_L1', loss_L1)
@@ -107,74 +121,46 @@ class GanModule(pl.LightningModule):
             output = {'loss': generator_loss}
             return output
 
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
 
         real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
         conditions = batch['Label']
+        batch_ids = batch['ImageName']
         fake_images = self.model.generator(conditions).detach()
 
         ssim_val = 1 - 2*self.val_criterion(fake_images, real_images)
-        wandb.log({'Validation Accuracy': ssim_val})
+        self.log('Validation Accuracy', ssim_val)
 
-        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx % 30 == 0:
-            figs, titles = log_images(epoch=self.current_epoch,
-                                      batch_idx=batch_idx,
-                                      image_list=[conditions, real_images, fake_images],
-                                      image_name_list=['condition', 'real image', 'fake image'],
-                                      cmap_list=['hot', 'gray', 'gray'],
-                                      filename=[''],
-                                      phase='train',
-                                      clim=(-1, 1))
+        self.update_visual_queue({'condition': conditions,
+                                  'real_image': real_images,
+                                  'fake_image': fake_images},
+                                 phase='val',
+                                 batch_idx=batch_idx)
 
-            self.t_logger[-1].log_image(figs, titles, "Validation Results")
+        if self.current_epoch > 0 and self.current_epoch % self.hparams.save_every_k_epochs == 0:
+            self.save_val_epochs_results({'labels': conditions,
+                                          'ct': real_images,
+                                          'ultrasound': fake_images,
+                                          'id': batch_ids})
 
         return {'val_loss': ssim_val}
 
-    def test_step(self, batch, batch_idx):
+    def save_val_epochs_results(self, data_dict):
 
-        if not os.path.exists(self.output_dataset):
-            os.mkdir(self.output_dataset)
+        current_save_folder = os.path.join(self.output_dataset_path, "epoch_" + str(self.current_epoch))
+        if not os.path.exists(current_save_folder):
+            os.mkdir(current_save_folder)
 
-        real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
-        conditions = batch['Label']
-        fake_images = self.model.generator(conditions).detach()
+        labels_list = tensor2np_array(data_dict['labels'])
+        ct_list = tensor2np_array(data_dict['ct'])
+        us_list = tensor2np_array(data_dict['ultrasound'])
+        id_list = data_dict['id']
 
-        if self.current_epoch % self.hparams.log_every_n_steps == 0 and batch_idx == 0:
-            figs, titles = log_images(epoch=self.current_epoch,
-                                      batch_idx=batch_idx,
-                                      image_list=[conditions, real_images, fake_images],
-                                      image_name_list=['condition', 'real image', 'fake image'],
-                                      cmap_list=['hot', 'gray', 'gray'],
-                                      filename=[''],
-                                      phase='train',
-                                      clim=(-1, 1))
+        for i, _ in enumerate(labels_list):
 
-            self.t_logger[-1].log_image(figs, titles, "Test Results")
-
-        np_conditions = tensor2np_array(conditions.cpu())
-        np_fake_images = tensor2np_array(fake_images.cpu())
-        np_real_images = tensor2np_array(real_images.cpu())
-
-        self.save_batch(conditions=np_conditions,
-                        fake_images=np_fake_images,
-                        real_images=np_real_images,
-                        filenames=filenames,
-                        fmt='png')
-
-        return {'test_loss': -1}
-
-    def save_batch(self, conditions, fake_images, real_images=None, filenames="", fmt='npy'):
-        if real_images is None:
-            real_images = [None for _ in conditions]
-
-        for condition, fake_image, real_images, filename in zip(conditions, fake_images, real_images, filenames):
-            condition_filename = os.path.join(self.output_dataset, filename + "_label")
-            real_filename = os.path.join(self.output_dataset, filename + "_ct")
-            fake_filename = os.path.join(self.output_dataset, filename + "_us")
-
-            save_data(condition, condition_filename, fmt=fmt)
-            save_data(real_images, real_filename, fmt=fmt)
-            save_data(fake_image, fake_filename, fmt=fmt)
+            save_data(labels_list[i], os.path.join(current_save_folder, id_list[i]) + '_label', fmt='png', is_label=True)
+            save_data(ct_list[i], os.path.join(current_save_folder, id_list[i]) + '_ct', fmt='png', is_label=False)
+            save_data(us_list[i], os.path.join(current_save_folder, id_list[i]) + '_sim_us', fmt='png', is_label=False)
 
     @staticmethod
     def add_module_specific_args(parser):

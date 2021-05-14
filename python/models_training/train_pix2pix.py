@@ -34,11 +34,11 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
     # ------------------------
     checkpoint_callback = ModelCheckpoint(
         dirpath=f"{hparams.output_path}/checkpoints/",
-        period=30,  # Interval (number of epochs) between checkpoints.
+        period=hparams.save_every_k_epochs,  # Interval (number of epochs) between checkpoints.
         verbose=True,
-        prefix=hparams.name,
+        prefix='ckpt',
         save_top_k=-1,  # if set to -1 all models are saved every <period> epochs
-        filename=f'{{epoch}}-{{{hparams.early_stopping_metric}:.2f}}'
+        filename=f'{{epoch}}'
     )
 
     trainer = Trainer(
@@ -55,8 +55,8 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
         log_every_n_steps=hparams.log_every_n_steps,
         auto_lr_find=True,
         auto_scale_batch_size=True,
-        #limit_train_batches=0.1,  # use 0.2 for Polyaxon, use 0.03 to avoid memory error on Anna's computer
-        limit_val_batches=0.1,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
+        # limit_train_batches=0.1,  # use 0.2 for Polyaxon, use 0.03 to avoid memory error on Anna's computer
+        # limit_val_batches=0.1,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
     )
     # ------------------------
     # 4 START TRAINING

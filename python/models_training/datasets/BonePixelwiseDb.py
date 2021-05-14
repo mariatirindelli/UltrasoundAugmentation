@@ -343,7 +343,6 @@ class MixedDb(pl.LightningDataModule):
     def __dataloader(self, split=None):
 
         # todo: change this!
-
         if split != 'train':
 
             dataloaders = [DataLoader(dataset=item,
@@ -354,16 +353,18 @@ class MixedDb(pl.LightningDataModule):
                                       pin_memory=True) for item in self.data[split]]
             return dataloaders
 
+
+
         dataloaders = dict()
         for dataset, folder_name in zip(self.data[split], getattr(self.hparams, split + "_folders")):
             shuffle_db = split == 'train'  # shuffle also for
             train_sampler = None
-            dataloaders[folder_name] = (DataLoader(dataset=dataset,
+            dataloaders[folder_name] = DataLoader(dataset=dataset,
                                                    batch_size=self.hparams.batch_size,
                                                    shuffle=shuffle_db,
                                                    sampler=train_sampler,
                                                    num_workers=self.hparams.num_workers,
-                                                   pin_memory=True))
+                                                   pin_memory=True)
 
         return dataloaders
 

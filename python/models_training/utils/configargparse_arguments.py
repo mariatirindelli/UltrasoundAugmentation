@@ -52,6 +52,8 @@ def build_configargparser(parser):
                                help='check val every n train epochs (default: 1)')
     trainer_group.add_argument('--save_top_k', type=int, default=1,
                                help='save the best k models. -1: save all models (default: 1)')
+    trainer_group.add_argument('--save_every_k_epochs', type=int, default=1,
+                               help='save the best k models. -1: save all models (default: 1)')
     trainer_group.add_argument('--early_stopping_metric', type=str, default='val_loss',
                                help='monitor a validation metric and stop the training when no improvement is observed '
                                     '(default: val_loss)')

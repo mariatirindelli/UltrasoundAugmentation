@@ -5,12 +5,6 @@ kind: group
 
 tags: [group]
 
-hptuning:
-  matrix:
-    config_file:
-      values: [config/pix2pix_config.yml]
-
-
 build:
   image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
   build_steps:
@@ -19,6 +13,11 @@ build:
     - apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev
     - pip install -r requirements.txt
     - wandb login b79150d26e52618b08c56a9aef76185e04aa8d6c
+
+hptuning:
+  matrix:
+    ct_weight:
+      values: [0.5, 0.2, 0.35, 0.7]
 
 environment:
   resources:
@@ -33,10 +32,23 @@ environment:
       limits: 1
 
 declarations:
-  data_root: /data/RutgersCampProject/CampDb/convex_probe
+  data_root: /data/RutgersCampProject/CampUSDb
+  config_file : config/pix2pix_config_semi_unpaired.yml
+  train_folders : 'convex_probe,CT_cropped_masked'
+  val_folders: 'CT_cropped_masked'
+  test_folders: 'CT_cropped_masked'
+  group_name: 'Label2US_SemiPaired'
+  project_name: 'US2CT'
+  num_workers : 4
 
 run:
   cmd:
    - python -u train_pix2pix.py -c={{ config_file }} \
                          --data_root={{ data_root }} \
+                         --train_folders={{ train_folders }} \
+                         --val_folders={{ val_folders }} \
+                         --test_folders={{ test_folders }} \
+                         --group_name={{ group_name }} \
+                         --project_name={{ project_name }} \
+                         --num_workers={{ num_workers }} \
                          --on_polyaxon

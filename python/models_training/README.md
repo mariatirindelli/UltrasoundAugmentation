@@ -74,6 +74,9 @@ scp E:\Chrissi\US_augmentation\public_datasets\BoneClassification.zip tirindelli
 
 scp mariatirindelli@10.23.0.56:/mnt/data/mariatirindelli/output/Pix2Pix/myres.zip D:\NAS
 
+scp mariatirindelli@10.23.0.54:/home/mariatirindelli/model_traning/results/210513-142855_GanModule_MixedDb_pix2pix_Pix2PixModel/pix2pix_o.zip D:\NAS
+scp mariatirindelli@10.23.0.54:/home/mariatirindelli/model_traning/results/210513-143217_GanSemiUnpairedModule_MixedDb_pix2pix_Pix2PixModel/mixed_o.zip D:\NAS
+
 ## TO CREATE POLYAXON PROJECT
 ```
 polyaxon project create --name CIFAR10_Example
@@ -83,5 +86,11 @@ polyaxon init CIFAR10_Example  --polyaxonfile
 ssh -L18097:localhost:8097 mariatirindelli@nevarro.ifl
 ```
 
+
+## to run groups on polyaxon: 
+hptuning:
+  matrix:
+    ct_weight:
+      values: [0.5, 0.2, 0.35, 0.7]
 
 wandb login
