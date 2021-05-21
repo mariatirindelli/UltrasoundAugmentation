@@ -1,9 +1,9 @@
 ---
 version: 1
 
-kind: group
+kind: experiment
 
-tags: [group]
+tags: [experiment]
 
 build:
   image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
@@ -13,11 +13,6 @@ build:
     - apt-get install -y libglib2.0-0 libsm6 libxext6 libxrender-dev
     - pip install -r requirements.txt
     - wandb login b79150d26e52618b08c56a9aef76185e04aa8d6c
-
-hptuning:
-  matrix:
-    ct_weight:
-      values: [0.5, 0.2, 0.35, 0.7]
 
 environment:
   resources:

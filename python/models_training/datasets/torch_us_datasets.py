@@ -2,7 +2,8 @@ from datasets.dataset_utils import *
 from PIL import Image, ImageDraw
 from torch.utils.data import Dataset
 import os
-from random import shuffle, sample
+from random import shuffle
+import imageio
 
 class BaseDataset(Dataset):
 
@@ -134,142 +135,36 @@ class BaseUnpairedDataset(Dataset):
         raise NotImplementedError
 
 
-class BaseMixedDataset(Dataset):
-    def __init__(self, hparams, split=None, unpaired_prefix=''):
-        super().__init__()
-        """
-        alpha = paired_percentage
-        1-alpha = unpaired_precentage
-        
-        to use all the paired data: 
-        alpha = n_paired / total_len --> total_len = n_paired / alpha
-        
-        then: 
-        1 - alpha = n_unpaired / total_len --> 1 - alpha = n_unpaired / (n_paired / alpha) = n_unpaired * alpha / n_paired
-         --> n_unpaired = (1-alpha) * n_paired / alpha
-         
-         if n_unpaired > n_unpaired_possible
-         n_paired = n_unpaired_possible * alpha / (1-alpha) 
-        
-        """
-
-        self.hparams = hparams
-        self.root = os.path.join(self.hparams.data_root, split)
-
-        unpaired_data_ids = [item for item in os.listdir(self.root) if unpaired_prefix in item]
-        paired_data_ids = [item for item in os.listdir(self.root) if unpaired_prefix not in item]
-
-        self.hparams.unpaired_percentage = float(self.hparams.unpaired_percentage)/100 if \
-            self.hparams.unpaired_percentage > 1 else self.hparams.unpaired_percentage
-
-        alpha = 1 - self.hparams.unpaired_percentage  # paired_percentage
-        n_paired = len(paired_data_ids)
-
-        n_unpaired = int((1-alpha) * n_paired / alpha)
-
-        if n_unpaired > len(unpaired_data_ids):
-            n_unpaired = len(unpaired_data_ids)
-            n_paired = int(n_unpaired * alpha / (1-alpha))
-
-        unpaired_data_ids = sample(unpaired_data_ids, n_unpaired)
-        paired_data_ids = sample(paired_data_ids, n_paired)
-
-        unpaired_is_paired_label = [False for _ in unpaired_data_ids]
-        paired_is_paired_label = [True for _ in paired_data_ids]
-
-        data_paths = [os.path.join(self.root, item) for item in unpaired_data_ids.extend(paired_data_ids)]
-        is_paired_labels = [item for item in unpaired_is_paired_label.extend(paired_is_paired_label)]
-
-        c = list(zip(data_paths, is_paired_labels))
-
-        random.shuffle(c)
-
-        self.AB_paths, self.is_paired_labels = zip(*c)
-
-    def __getitem__(self, idx):
-        raise NotImplementedError
+class USSweepPaired(BasePairedDataset):
+    def __init__(self, hparams, split, **kwargs):
+        super().__init__(hparams, split, **kwargs)
+        self.batches_per_sweep = 100
 
     def __len__(self):
-        return len(self.AB_paths)
+        return self.batches_per_sweep * len(self.AB_paths)
 
+    def __getitem__(self, idx):
+        # read a image given a random integer index
+        A_path = self.AB_paths[idx].replace(".tiff", "_label.tiff")  # label
+        B_path = self.AB_paths[idx]  # image
 
-# class USCTBonesMixed(BaseMixedDataset):
-#     def __init__(self, hparams, split=None, data_structure='folder_based'):
-#
-#         if data_structure != 'folder_based':
-#             raise NotImplementedError("Mixed Db is only implemented with folder based structure")
-#         super().__init__(hparams, split=split, unpaired_prefix='CT')
-#         self.input_nc = hparams.input_nc
-#         self.output_nc = hparams.output_nc
-#
-#         self.no_data_symbol = None
-#
-#     def __getitem__(self, idx):
-#         # read a image given a random integer index
-#         A_path = self.AB_paths[idx].replace(".png", "_label.png")  # label
-#         B_path = self.AB_paths[idx]  # image - either ct or label
-#
-#         is_paired = self.is_paired_labels[idx]
-#
-#         image_name = os.path.split(B_path)[-1].replace(".png", "")
-#
-#         A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None  # condition
-#         B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None  # image
-#
-#         if self.no_data_symbol is None:
-#             im = Image.new('LA', A.size)
-#             draw = ImageDraw.Draw(im)
-#             draw.line((0, 0) + im.size, fill=255)
-#             draw.line((0, im.size[1], im.size[0], 0), fill=255)
-#
-#         # apply the same transform to both A and B
-#         transform_params = get_params(self.hparams, A.size)
-#         A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
-#         B_transform = get_transform(self.hparams, transform_params, grayscale=(self.output_nc == 1))
-#
-#         A = A_transform(A) if A is not None else None
-#         B = B_transform(B) if B is not None else None
-#         no_data_symbol = A_transform(self.no_data_symbol)
-#
-#         if is_paired:
-#             return {'US': B,
-#                     'Label': A,
-#                     'CT': no_data_symbol,
-#                     'ImageName': image_name,
-#                     'isPaired': True}
-#
-#         return {'US': no_data_symbol,
-#                 'Label': A,
-#                 'CT': B,
-#                 'ImageName': image_name,
-#                 'isPaired': False}
+        image_name = os.path.split(B_path)[-1].replace(".tiff", "")
 
+        A = imageio.imread(A_path) if os.path.exists(A_path) else None  # condition
+        B = imageio.imread(B_path) if os.path.exists(B_path) else None  # image
 
-# class USBonesPaired(BasePairedDataset):
-#     def __init__(self, hparams, split=None, subject_list=None, data_list=None, data_structure='folder_based'):
-#         super().__init__(hparams, split, subject_list, data_list, data_structure)
-#
-#     def __getitem__(self, idx):
-#         # read a image given a random integer index
-#         A_path = self.AB_paths[idx].replace(".png", "_label.png")  # label
-#         B_path = self.AB_paths[idx]  # image
-#
-#         image_name = os.path.split(B_path)[-1].replace(".png", "")
-#
-#         A = Image.open(A_path).convert('LA') if os.path.exists(A_path) else None  # condition
-#         B = Image.open(B_path).convert('LA') if os.path.exists(B_path) else None  # image
-#
-#         # apply the same transform to both A and B
-#         transform_params = get_params(self.hparams, A.size)
-#         A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
-#         B_transform = get_transform(self.hparams, transform_params, grayscale=(self.output_nc == 1))
-#
-#         A = A_transform(A) if A is not None else None
-#         B = B_transform(B) if B is not None else None
-#
-#         return {'Image': B,
-#                 'Label': A,
-#                 'ImageName': image_name}
+        # apply the same transform to both A and B
+        # todo: check transform when using multiple channels
+        transform_params = get_params(self.hparams, A.size)
+        A_transform = get_transform(self.hparams, transform_params, grayscale=(self.input_nc == 1))
+        B_transform = get_transform(self.hparams, transform_params, grayscale=(self.output_nc == 1))
+
+        A = A_transform(A) if A is not None else None
+        B = B_transform(B) if B is not None else None
+
+        return {'Image': B,
+                'Label': A,
+                'ImageName': image_name}
 
 
 class USBonesPaired(BasePairedDataset):

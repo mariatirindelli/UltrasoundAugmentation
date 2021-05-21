@@ -2,10 +2,12 @@ import pandas as pd
 import os
 import numpy as np
 import argparse
-import random
+from PIL import Image
+import imageio
+from models_training.datasets.dataset_utils import get_subject_ids_from_data, get_subject_based_random_split, \
+    get_split_subjects_data
 
-def prepare_data_list(input_db_path, output_save_path, logger):
-
+def prepare_imfusion_db_list(input_db_path):
     # 1. Read data_list.txt - the .txt file saved by ImFusionLabels in the export folder
     imf_data_list_path = os.path.join(input_db_path, "data_list.txt")
     pd_frame = pd.read_csv(imf_data_list_path, sep="\t")
@@ -20,6 +22,13 @@ def prepare_data_list(input_db_path, output_save_path, logger):
         return_list.append([input_image_path, input_label_path, subject_name])
 
     return return_list
+
+def prepare_data_list(input_db_path, db_kind='imfusion_label'):
+
+    if db_kind == 'imfusion_label':
+        db_list = prepare_imfusion_db_list(input_db_path)
+
+    return db_list
 
 
 def get_sub_id_from_filename(filename):
@@ -81,6 +90,50 @@ def images2sweep(file_list):
             data_dict[sub_id][sweep_id] = sorted_sweep_files
 
     return data_dict
+
+def save_data(data, save_path):
+    fmt = save_path.split(".")[-1]
+
+    if fmt == 'tiff':
+        imageio.mimwrite(save_path, data)
+    else:
+        raise NotImplementedError
+
+def apply_mask(image, mask):
+    masked_image = image.copy()
+
+    if image.shape != mask.shape:
+        mask = np.tile(mask, (image.shape[0], 1, 1))
+
+    masked_image[mask == 0] = 0
+
+    return masked_image
+
+def get_split_paths(data_root):
+
+    data_list = os.listdir(data_root)
+    data_list = [item for item in data_list if 'label' not in item]
+    sub_ids = get_subject_ids_from_data(data_list)
+    train_ids, val_ids, test_ids = get_subject_based_random_split(sub_ids)
+
+    print(train_ids, " ", val_ids, " ", test_ids)
+
+    train_data = get_split_subjects_data(data_list, train_ids)
+    val_data = get_split_subjects_data(data_list, val_ids)
+    test_data = get_split_subjects_data(data_list, test_ids)
+
+    return {'train': train_data, 'val': val_data, 'test': test_data}
+
+def load_image(image_path, vflip=True):
+    if os.path.exists(image_path):
+        data_mask = Image.open(image_path)
+        if vflip:
+            data_mask = data_mask.transpose(Image.FLIP_TOP_BOTTOM)
+        data_mask = np.array(data_mask)  # flipping mask as images are saved flipped
+    else:
+        data_mask=None
+
+    return data_mask
 
 
 def str2bool(v):

@@ -23,14 +23,14 @@ class GanSemiUnpairedModule(pl.LightningModule):
         self.val_criterion = pytorch_ssim.SSIM(window_size=11)
         self.output_dataset_path = os.path.join(self.hparams.output_path, "output_db")
 
-        self.db_weights = {'CT_cropped_masked': self.hparams.ct_weight, 'convex_probe':  1 - self.hparams.ct_weight}
+        self.unpaired_db_name = 'CT_cropped_masked'
+        self.paired_db_name = 'convex_probe'
+
+        self.unpaired_weight = self.hparams.ct_weight
+        self.paired_weight = 1 - self.hparams.ct_weight
 
         if not os.path.exists(self.output_dataset_path):
             os.mkdir(self.output_dataset_path)
-
-    def val_dataloader(self):
-        tmp = self.val_dataloader()
-        return tmp
 
     def configure_optimizers(self):
 
@@ -60,6 +60,20 @@ class GanSemiUnpairedModule(pl.LightningModule):
         discriminator_loss = (discriminator_loss_real + discriminator_loss_fake) * 0.5
         return discriminator_loss
 
+    def _get_unpaired_discriminator_loss(self, real_images, real_conditions, fake_images, fake_conditions):
+
+        fake_discriminator_input = torch.cat((fake_conditions, fake_images), 1)
+        fake_predictions = self.model.discriminator(fake_discriminator_input)
+        discriminator_loss_fake = self.criterionGAN(fake_predictions, False)
+
+        # Loss on discriminating real images
+        real_discriminator_input = torch.cat((real_conditions, real_images), 1)
+        real_predictions = self.model.discriminator(real_discriminator_input)
+        discriminator_loss_real = self.criterionGAN(real_predictions, True)
+
+        discriminator_loss = (discriminator_loss_real + discriminator_loss_fake) * 0.5
+        return discriminator_loss
+
     def _get_generator_adversarial_loss(self, conditions, fake_images):
         fake_discriminator_input = torch.cat((conditions, fake_images), 1)
         fake_predictions = self.model.discriminator(fake_discriminator_input)
@@ -68,7 +82,7 @@ class GanSemiUnpairedModule(pl.LightningModule):
 
     def update_visual_queue(self, image_dict, phase, batch_idx):
 
-        log_every_n_batch = 50 if phase == 'train' else 20
+        log_every_n_batch = 20 if phase == 'train' else 10
 
         if phase == 'train':
             title = 'Training Result'
@@ -90,58 +104,73 @@ class GanSemiUnpairedModule(pl.LightningModule):
 
     def training_step(self, batch_dict, batch_idx, optimizer_idx):
 
-        num_dataset = len(batch_dict.keys())
-
         # Discriminator step
         if optimizer_idx == 0:
 
-            discriminator_loss_total = 0
-            for dataloader_idx, dataset_name in enumerate(batch_dict.keys()):
-                real_images = batch_dict[dataset_name]['Image']  # are the US for dataloader_idx = 0, the CT otherwise
-                conditions = batch_dict[dataset_name]['Label']
+            real_images = batch_dict[self.paired_db_name]['Image']  # are the US for dataloader_idx = 0, the CT otherwise
+            conditions = batch_dict[self.paired_db_name]['Label']
 
-                fake_images = self.forward(conditions).detach()
-                discriminator_loss = self._get_discriminator_loss(real_images=real_images,
-                                                                  conditions=conditions,
-                                                                  fake_images=fake_images)
+            fake_images = self.forward(conditions).detach()
+            discriminator_loss_paired = self._get_discriminator_loss(real_images=real_images,
+                                                                     conditions=conditions,
+                                                                     fake_images=fake_images)
 
-                # Loss on discriminating fake images
+            # todo: change no concatenation per la unpaired loss
 
-                self.update_visual_queue({'condition': conditions,
-                                          'real_image': real_images,
-                                          'fake_image': fake_images},
-                                         phase='train',
-                                         batch_idx=batch_idx)
+            conditions_unpaired = batch_dict[self.unpaired_db_name]['Label']
+            fake_images_unpaired = self.forward(conditions_unpaired).detach()
+            discriminator_loss_unpaired = self._get_unpaired_discriminator_loss(real_images=real_images,
+                                                                                real_conditions=conditions,
+                                                                                fake_images=fake_images_unpaired,
+                                                                                fake_conditions=conditions_unpaired)
 
-                self.log('Train discriminator loss - ' + str(dataset_name), discriminator_loss)
-                discriminator_loss_total += discriminator_loss * self.db_weights[dataset_name]
+            discriminator_loss = self.unpaired_weight*discriminator_loss_unpaired +\
+                                 self.paired_weight*discriminator_loss_paired
 
-            output = {'loss': discriminator_loss_total}
-            self.log('Train discriminator loss total', discriminator_loss_total)
+            # Loss on discriminating fake images
+
+            self.update_visual_queue({'condition': conditions,
+                                      'real_image': real_images,
+                                      'fake_image': fake_images},
+                                     phase='train',
+                                     batch_idx=batch_idx)
+
+            self.log('Train discriminator loss - ' + str('convex_probe'), discriminator_loss)
+
+            output = {'loss': discriminator_loss}
+            self.log('Train discriminator loss total', discriminator_loss)
             return output
 
         # Generator step
         elif optimizer_idx == 1:
-            generator_loss_total = 0
-            for dataloader_idx, dataset_name in enumerate(batch_dict.keys()):
-                real_images = batch_dict[dataset_name]['Image']  # are the US for dataloader_idx = 0, the CT otherwise
-                conditions = batch_dict[dataset_name]['Label']
-                # Pix2Pix has adversarial and a reconstruction loss
-                fake_images = self.forward(conditions)
-                generator_adversarial_loss = self._get_generator_adversarial_loss(conditions=conditions,
-                                                                                  fake_images=fake_images)
 
-                self.log('Train generator adversarial loss- ' + str(dataset_name), generator_adversarial_loss)
+            # computing the generator loss on the paired db
+            real_images = batch_dict[self.paired_db_name]['Image']  # US for dataloader_idx = 0, CT otherwise
+            conditions = batch_dict[self.paired_db_name]['Label']
+            fake_images = self.forward(conditions)
+            generator_adversarial_loss_paired = self._get_generator_adversarial_loss(conditions=conditions,
+                                                                                     fake_images=fake_images)
 
-                generator_loss_total += generator_adversarial_loss * self.db_weights[dataset_name]
+            # computing the adversarial loss on the unpaired db
+            conditions_unpaired = batch_dict[self.unpaired_db_name]['Label']
+            fake_images_unpaired = self.forward(conditions_unpaired)
+            generator_adversarial_loss_unpaired = self._get_generator_adversarial_loss(conditions=conditions_unpaired,
+                                                                                       fake_images=fake_images_unpaired)
 
-                if 'convex' in dataset_name:
-                    similarity_loss = self.criterionL1(fake_images, real_images) * self.hparams.lambda_L1
-                    generator_loss_total += similarity_loss * self.db_weights[dataset_name]
-                    self.log('Train generator similarity loss ' + str(dataset_name), similarity_loss)
+            # computing the weighted sum of unpaired and paired adversarial loss
+            generator_adversarial_loss = self.unpaired_weight*generator_adversarial_loss_unpaired + \
+                             self.paired_weight*generator_adversarial_loss_paired
+            self.log('Train generator adversarial loss', generator_adversarial_loss)
 
-            output = {'loss': generator_loss_total}
-            self.log('Train generator loss total', generator_loss_total)
+            # computing the similarity loss
+            similarity_loss = self.criterionL1(fake_images, real_images) * self.hparams.lambda_L1
+
+            # computing the total generator loss as similarity + adversarial loss
+            generator_loss = similarity_loss + generator_adversarial_loss
+            self.log('Train generator similarity loss', similarity_loss)
+            self.log('Train generator loss', generator_loss)
+
+            output = {'loss': generator_loss}
             return output
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
@@ -157,7 +186,7 @@ class GanSemiUnpairedModule(pl.LightningModule):
                                  phase='val',
                                  batch_idx=batch_idx)
 
-        if self.current_epoch > 0 and self.current_epoch % self.hparams.save_every_k_epochs == 0:
+        if self.current_epoch > 0:
             self.save_val_epochs_results({'labels': conditions,
                                           'ct': real_images,
                                           'ultrasound': fake_images,
@@ -195,7 +224,6 @@ class GanSemiUnpairedModule(pl.LightningModule):
             save_data(labels_list[i], os.path.join(current_save_folder, id_list[i]) + '_label', fmt='png', is_label=True)
             save_data(ct_list[i], os.path.join(current_save_folder, id_list[i]) + '_ct', fmt='png', is_label=False)
             save_data(us_list[i], os.path.join(current_save_folder, id_list[i]) + '_sim_us', fmt='png', is_label=False)
-
 
     @staticmethod
     def add_module_specific_args(parser):

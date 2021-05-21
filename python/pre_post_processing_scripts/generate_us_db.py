@@ -28,9 +28,7 @@ def save_png(data_array, path):
 def save_db(save_path, imfusion_exported_data_path, start_sub_id=0, rescale_labels=False, data_mask=None,
             file_logger=None):
 
-    data_list = prepare_data_list(input_db_path=imfusion_exported_data_path,
-                                  output_save_path=save_path,
-                                  logger=logger)
+    data_list = prepare_data_list(input_db_path=imfusion_exported_data_path)
 
     subjects_name_list = list(set([item[-1] for item in data_list]))
     name_id_dict = get_name_id_dict(subjects_name_list, start_sub_id=start_sub_id)

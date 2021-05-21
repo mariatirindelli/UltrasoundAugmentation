@@ -76,13 +76,12 @@ class Visualizer:
 
 class CustomWandbLogger(WandbLogger):
     def __init__(self, hparams, queue_len=10):
-        super().__init__(project="test", group=hparams.group_name)
+        super().__init__(project=hparams.project_name, group=hparams.group_name, job_type='train')
         self.train_visualizer = Visualizer(queue_len)
         self.val_visualizer = Visualizer(queue_len)
 
         self.update_image_queue = self._update_image_queue
-
-        self.log_hyperparams(hparams)
+        self.experiment.config.update(hparams)
 
     def _update_image_queue(self, image_dict, epoch, phase):
 
@@ -92,25 +91,6 @@ class CustomWandbLogger(WandbLogger):
             return self.val_visualizer.update_image_queue(image_dict, epoch)
         else:
             raise ValueError("Unknown phase")
-
-    def save_images(self, root, tensor_list, tensor_id_list, fmt='png'):
-        """
-
-        Args:
-            tensor_list: a list of tensors: [torch.Tensor(N, C, H, W), torch.Tensor(N, C, H, W), torch.Tensor(N, C, H, W)]
-            tensor_id_list: a list of list of filepaths: [ [fname1, ..., fnameN], [fname1, ..., fnameN], [fname1, fnameN] ]
-
-        """
-
-        for image_batch, batch_ids in zip(tensor_list, tensor_id_list):
-
-            images_list = tensor2np_array(image_batch)
-
-            if len(images_list[0].shape) == 3:
-                images_list = [self.reshape_rgb_images(item) for item in images_list]
-
-            for image, image_id in zip(images_list, batch_ids):
-                save_data(image, os.path.join(root, batch_ids), fmt=fmt)
 
     def log_image_queue(self, phase, title='', images_keys=None):
 

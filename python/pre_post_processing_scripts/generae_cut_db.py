@@ -1,24 +1,7 @@
 import argparse
 import os
 import shutil
-
-from models_training.datasets.dataset_utils import get_subject_ids_from_data, get_subject_based_random_split, \
-    get_split_subjects_data
-
-def get_split_paths(data_root):
-
-    data_list = os.listdir(data_root)
-    data_list = [item for item in data_list if 'label' not in item]
-    sub_ids = get_subject_ids_from_data(data_list)
-    train_ids, val_ids, test_ids = get_subject_based_random_split(sub_ids)
-
-    print(train_ids, " ", val_ids, " ", test_ids)
-
-    train_data = get_split_subjects_data(data_list, train_ids)
-    val_data = get_split_subjects_data(data_list, val_ids)
-    test_data = get_split_subjects_data(data_list, test_ids)
-
-    return {'train': train_data, 'val': val_data, 'test': test_data}
+from pre_post_processing_scripts.proc_utils import get_split_paths
 
 def main(params):
 
