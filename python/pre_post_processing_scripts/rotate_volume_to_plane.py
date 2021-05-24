@@ -1,7 +1,5 @@
 import plotly.graph_objs as go
-from plotly.offline import plot
 import numpy as np
-from sklearn.decomposition import PCA
 import SimpleITK as sitk
 from scipy.spatial.transform import Rotation as R
 
@@ -77,29 +75,29 @@ def get_center(img):
 
 
 def rotation3d(image, theta_x, theta_y, theta_z, center_x, center_y, center_z):
-  """
-  This function rotates an image across each of the x, y, z axes by theta_x, theta_y, and theta_z degrees
-  respectively
-  :param image: An sitk MRI image
-  :param theta_x: The amount of degrees the user wants the image rotated around the x axis
-  :param theta_y: The amount of degrees the user wants the image rotated around the y axis
-  :param theta_z: The amount of degrees the user wants the image rotated around the z axis
-  :param show: Boolean, whether or not the user wants to see the result of the rotation
-  :return: The rotated image
-  """
-  theta_x = np.deg2rad(theta_x)
-  theta_y = np.deg2rad(theta_y)
-  theta_z = np.deg2rad(theta_z)
+    """
+    This function rotates an image across each of the x, y, z axes by theta_x, theta_y, and theta_z degrees
+    respectively
+    :param image: An sitk MRI image
+    :param theta_x: The amount of degrees the user wants the image rotated around the x axis
+    :param theta_y: The amount of degrees the user wants the image rotated around the y axis
+    :param theta_z: The amount of degrees the user wants the image rotated around the z axis
+    :param show: Boolean, whether or not the user wants to see the result of the rotation
+    :return: The rotated image
+    """
+    theta_x = np.deg2rad(theta_x)
+    theta_y = np.deg2rad(theta_y)
+    theta_z = np.deg2rad(theta_z)
 
-  image_center_tmp = get_center(image)
-  image_center = (center_x, center_y, center_z)
-  euler_transform = sitk.Euler3DTransform(image_center, theta_x, theta_y, theta_z, (0, 0, 0))
+    image_center_tmp = get_center(image)
+    image_center = (center_x, center_y, center_z)
+    euler_transform = sitk.Euler3DTransform(image_center, theta_x, theta_y, theta_z, (0, 0, 0))
 
-  euler_transform.SetCenter(image_center)
-  euler_transform.SetRotation(theta_x, theta_y, theta_z)
-  resampled_image = resample(image, euler_transform)
+    euler_transform.SetCenter(image_center)
+    euler_transform.SetRotation(theta_x, theta_y, theta_z)
+    resampled_image = resample(image, euler_transform)
 
-  return resampled_image
+    return resampled_image
 
 
 def rotation_matrix_from_vectors(vec1, vec2):
@@ -139,15 +137,15 @@ thetas = rot_mat.as_euler('zyx', degrees=True)
 
 thetas = [int(thetas[0]), int(thetas[1]), int(thetas[2])]
 
-print(centroid)
-print(thetas)
 center_x, center_y, center_z = centroid[1], centroid[2], centroid[0]
-
 theta_z, theta_y, theta_x = thetas[1], thetas[2], thetas[0]
 
-
-rotated_volume = rotation3d(sitk_image, 15, 0, 0, center_x, center_y, center_z)
+print(thetas)
+rotated_volume = rotation3d(sitk_image, theta_x, theta_y, theta_z, center_x, center_y, center_z)
 rotated_array = sitk.GetArrayFromImage(rotated_volume)
+
+sitk.WriteImage(sitk.GetImageFromArray(rotated_array), "rotated_real_new.mhd")
+sitk.WriteImage(sitk.GetImageFromArray(vol), "non_rotated_real_new.mhd")
 
 rotated_array[0:180, :, :] = 0
 rotated_points = np.argwhere(rotated_array > 0)
