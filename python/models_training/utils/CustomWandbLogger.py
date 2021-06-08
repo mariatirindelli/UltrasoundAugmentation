@@ -1,5 +1,5 @@
 from pytorch_lightning.loggers import WandbLogger
-from utils.utils import tensor2np_array, save_data
+from utils.utils import tensor2im, save_data
 import numpy as np
 import wandb
 import os
@@ -36,7 +36,7 @@ class Visualizer:
 
         for key in image_dict.keys():
 
-            images_list = tensor2np_array(image_dict[key])
+            images_list = tensor2im(image_dict[key])
             if len(images_list[0].shape) > 2 and images_list[0].shape[0] == 3:
                 images_list = [self.reshape_rgb_images(item) for item in images_list]
 
@@ -57,6 +57,27 @@ class Visualizer:
     def clean_visuals_queue(self):
         self.image_queue = dict()
 
+    def direct_plot(self, image_dict, epoch, split_batches = False):
+        image_dct = dict()
+
+        image_keys = image_dict.keys()
+        batch_size = 2  # todo: fix this hard coded
+
+        for key in image_dict.keys():
+            images_list = tensor2im(image_dict[key])
+
+            # todo: check this
+            # if len(images_list[0].shape) > 2 and images_list[0].shape[0] == 3:
+            #     images_list = [self.reshape_rgb_images(item) for item in images_list]
+            #
+            # if len(images_list[0].shape) > 2 and images_list[0].shape[0] != 1 and images_list[0].shape[0] != 3:
+            #     images_list = self.flat_channel_as_images(images_list)
+
+            image_dct[key] = images_list
+
+        return self.stack_images(image_dct)
+
+
     @staticmethod
     def pad_image(image, padding):
 
@@ -65,17 +86,20 @@ class Visualizer:
         else:
             return np.pad(image, ((padding, padding), (padding, padding), (0, 0)), mode='constant', constant_values=1)
 
-    def stack_images(self, images_keys=None):
+    def stack_image_queue(self, images_keys=None):
+        return self.stack_images(self.image_queue, images_keys)
+
+    def stack_images(self, image_dict, images_keys=None):
 
         image_rows = []
         title = ''
         if images_keys is None:
-            images_keys = self.image_queue.keys()
+            images_keys = image_dict.keys()
 
-        for key in self.image_queue.keys():
+        for key in image_dict.keys():
             if key not in images_keys:
                 continue
-            padded_images = [self.pad_image(item, padding=5) for item in self.image_queue[key]]
+            padded_images = [self.pad_image(item, padding=5) for item in image_dict[key]]
             image_rows.append(np.concatenate(padded_images, axis=0))
 
             title += " " + key
@@ -102,11 +126,21 @@ class CustomWandbLogger(WandbLogger):
         else:
             raise ValueError("Unknown phase")
 
+    def direct_plot(self, image_dict, epoch, phase, title=''):
+        if phase == 'train':
+            concatenated_image, title_img = self.train_visualizer.direct_plot(image_dict, epoch, split_batches=False)
+        elif phase == 'val':
+            concatenated_image, title_img = self.val_visualizer.direct_plot(image_dict, epoch, split_batches=False)
+        else:
+            raise ValueError("Unknown phase")
+
+        self.experiment.log({title + title_img: wandb.Image(concatenated_image)})
+
     def log_image_queue(self, phase, title='', images_keys=None):
 
         if phase == 'train':
-            concatenated_image, title_img = self.train_visualizer.stack_images(images_keys)
+            concatenated_image, title_img = self.train_visualizer.stack_image_queue(images_keys)
         elif phase == 'val':
-            concatenated_image, title_img = self.val_visualizer.stack_images(images_keys)
+            concatenated_image, title_img = self.val_visualizer.stack_image_queue(images_keys)
 
         self.experiment.log({title + title_img: wandb.Image(concatenated_image)})

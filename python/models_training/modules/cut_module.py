@@ -180,6 +180,13 @@ class CUT2D(pl.LightningModule):
         if optimizer_idx == 1:
             # update D
             loss = self.compute_disc_loss()
+
+            # todo handle this better
+            fake = self.fake_B.detach()
+            self.logger.direct_plot({'real': self.real,
+                                     'fake': fake},
+                                    epoch=self.current_epoch,
+                                    phase='train')
             loss_D = loss.detach()
         elif optimizer_idx == 0:
             # update G
@@ -187,11 +194,13 @@ class CUT2D(pl.LightningModule):
             loss_G = loss.detach()
         else:
             raise Exception("optimizer id is out of range")
+
         return {'loss': loss, 'loss_G': loss_G, 'loss_D': loss_D}
 
     def compute_disc_loss(self) -> torch.Tensor:
         """Calculate GAN loss for the discriminator"""
         fake = self.fake_B.detach()
+
         # Fake; stop backprop to the generator by detaching fake_B
         pred_fake = self.netD(fake)
         self.loss_disc_fake = self.criterionGAN_syn(pred_fake, False).mean()
@@ -277,6 +286,7 @@ class CUT2D(pl.LightningModule):
             self.log('NCE Y', self.loss_NCE_Y.detach(), on_step=True, on_epoch=True)
         if self.loss_NCE is not None:
             self.log('NCE', self.loss_NCE.detach(), on_step=True, on_epoch=True)
+
         return {'loss': train_step_output['loss']}
 
     def training_epoch_end(self, train_epoch_output):

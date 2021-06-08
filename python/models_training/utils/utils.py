@@ -4,6 +4,7 @@ import inspect
 import argparse
 import numpy as np
 from PIL import Image
+import torch
 
 def argparse_summary(arg_list, parser):
     arg_dict = vars(arg_list)
@@ -94,6 +95,40 @@ def tensor2np_array(input_tensor):
         output_data.append(np_array)
 
     return output_data
+
+def tensor2im(input_image, imtype=np.uint8):
+    """"Converts a Tensor array into a numpy image array.
+
+    Parameters:
+        input_image (tensor) --  the input image tensor array
+        imtype (type)        --  the desired type of the converted numpy array
+    """
+    if isinstance(input_image, np.ndarray):
+        return [input_image.astype(imtype)]
+
+    if isinstance(input_image, torch.Tensor):  # get the data from a variable
+        image_tensor = input_image.data
+    else:
+        return input_image
+
+    image_list = []
+    for i in range(image_tensor.size(0)):
+        for j in range(image_tensor.size(1)):
+
+            image_numpy = image_tensor[i, j, ...].clamp(-1.0, 1.0).cpu().float().numpy()  # convert it into a numpy array
+            image_numpy = np.expand_dims(image_numpy, 0)
+            if image_numpy.shape[0] == 1:  # grayscale to RGB
+                image_numpy = np.tile(image_numpy, (3, 1, 1))
+            image_numpy = (np.transpose(image_numpy,
+                                        (1, 2, 0)) + 1) / 2.0 * 255.0  # post-processing: tranpose and scaling
+
+            image_list.append(image_numpy.astype(imtype))
+
+    return image_list
+
+
+
+
 
 def save_data(data, filename, fmt='npy', is_label=False):
 
