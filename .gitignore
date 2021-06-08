@@ -36,3 +36,4 @@ python/models_training/wandb/
 *.mhd
 *.html
 *.raw
+python/models_training/data/

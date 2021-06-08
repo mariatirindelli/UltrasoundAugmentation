@@ -80,7 +80,7 @@ def main(args):
     epochs_folds = os.listdir(args.root)
     id_list = get_id_list(os.path.join(args.root, epochs_folds[0]))
 
-    out_ids = [item.replace("_label", "") for item in os.listdir(args.out_path) if "_label" in item]
+    out_ids = [item.replace("_label.png", "") for item in os.listdir(args.out_path) if "_label" in item]
 
     h, w = (512, 512)
 
@@ -88,6 +88,9 @@ def main(args):
 
         # do not look at images already selected in the output folder
         if img_id in out_ids:
+            continue
+
+        if img_id[0] == "0" or img_id[0] == "2" or img_id[0] == "3" or img_id[0] == "4" or img_id[0] == "5":
             continue
 
         ct_header = cv2.imread(os.path.join(args.root, epochs_folds[0], img_id + '_ct.png'), 0)

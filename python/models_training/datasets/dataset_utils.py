@@ -3,6 +3,10 @@ import torchvision.transforms as transforms
 import os
 import random
 import numpy as np
+import torch
+
+
+# todo: convert all the __ method to work with tensors too
 
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
@@ -12,7 +16,11 @@ IMG_EXTENSIONS = [
 
 
 def __make_power_2(img, base, method=Image.BICUBIC):
-    ow, oh = img.size
+
+    if isinstance(img, torch.Tensor):
+        ow, oh = img.size(-2), img.size(-1)
+    else:
+        ow, oh = img.size
     h = int(round(oh / base) * base)
     w = int(round(ow / base) * base)
     if h == oh and w == ow:
@@ -51,6 +59,58 @@ def __print_size_warning(ow, oh, w, h):
               "whose sizes are not multiples of 4" % (ow, oh, w, h))
         __print_size_warning.has_printed = True
 
+def __random_zoom(img, target_width, crop_width, method=Image.BICUBIC, factor=None):
+    if factor is None:
+        zoom_level = np.random.uniform(0.8, 1.0, size=[2])
+    else:
+        zoom_level = (factor[0], factor[1])
+    iw, ih = img.size
+    zoomw = max(crop_width, iw * zoom_level[0])
+    zoomh = max(crop_width, ih * zoom_level[1])
+    img = img.resize((int(round(zoomw)), int(round(zoomh))), method)
+    return img
+
+def __scale_shortside(img, target_width, crop_width, method=Image.BICUBIC):
+    ow, oh = img.size
+    shortside = min(ow, oh)
+    if shortside >= target_width:
+        return img
+    else:
+        scale = target_width / shortside
+        return img.resize((round(ow * scale), round(oh * scale)), method)
+
+def __trim(img, trim_width):
+    ow, oh = img.size
+    if ow > trim_width:
+        xstart = np.random.randint(ow - trim_width)
+        xend = xstart + trim_width
+    else:
+        xstart = 0
+        xend = ow
+    if oh > trim_width:
+        ystart = np.random.randint(oh - trim_width)
+        yend = ystart + trim_width
+    else:
+        ystart = 0
+        yend = oh
+    return img.crop((xstart, ystart, xend, yend))
+
+def __patch(img, index, size):
+    ow, oh = img.size
+    nw, nh = ow // size, oh // size
+    roomx = ow - nw * size
+    roomy = oh - nh * size
+    startx = np.random.randint(int(roomx) + 1)
+    starty = np.random.randint(int(roomy) + 1)
+
+    index = index % (nw * nh)
+    ix = index // nh
+    iy = index % nh
+    gridx = startx + ix * size
+    gridy = starty + iy * size
+    return img.crop((gridx, gridy, gridx + size, gridy + size))
+
+
 def get_params(opt, size):
     w, h = size
     new_h = h
@@ -68,15 +128,32 @@ def get_params(opt, size):
 
     return {'crop_pos': (x, y), 'flip': flip}
 
-def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True):
+def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, convert=True, num_channels=3):
     transform_list = []
     if grayscale:
         transform_list.append(transforms.Grayscale(1))
+        num_channels = 1
+
+    if 'fixsize' in opt.preprocess:
+        transform_list.append(transforms.Resize(params["size"], method))
+
     if 'resize' in opt.preprocess:
         osize = [opt.load_size, opt.load_size]
         transform_list.append(transforms.Resize(osize, method))
+
     elif 'scale_width' in opt.preprocess:
         transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.load_size, opt.crop_size, method)))
+
+    elif 'scale_shortside' in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __scale_shortside(img, opt.load_size, opt.crop_size, method)))
+
+    if 'zoom' in opt.preprocess:
+        if params is None:
+            transform_list.append(
+                transforms.Lambda(lambda img: __random_zoom(img, opt.load_size, opt.crop_size, method)))
+        else:
+            transform_list.append(transforms.Lambda(
+                lambda img: __random_zoom(img, opt.load_size, opt.crop_size, method, factor=params["scale_factor"])))
 
     if 'crop' in opt.preprocess:
         if params is None:
@@ -84,8 +161,14 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
         else:
             transform_list.append(transforms.Lambda(lambda img: __crop(img, params['crop_pos'], opt.crop_size)))
 
-    if opt.preprocess == 'none':
-        transform_list.append(transforms.Lambda(lambda img: __make_power_2(img, base=4, method=method)))
+    if 'patch' in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __patch(img, params['patch_index'], opt.crop_size)))
+
+    if 'trim' in opt.preprocess:
+        transform_list.append(transforms.Lambda(lambda img: __trim(img, opt.crop_size)))
+
+    # if opt.preprocess == 'none':
+    transform_list.append(transforms.Lambda(lambda img: __make_power_2(img, base=4, method=method)))
 
     if not opt.no_flip:
         if params is None:
@@ -95,10 +178,9 @@ def get_transform(opt, params=None, grayscale=False, method=Image.BICUBIC, conve
 
     if convert:
         transform_list += [transforms.ToTensor()]
-        if grayscale:
-            transform_list += [transforms.Normalize((0.5,), (0.5,))]
-        else:
-            transform_list += [transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+
+    transform_list += [
+        transforms.Normalize([0.5 for _ in range(num_channels)], [0.5 for _ in range(num_channels)])]
     return transforms.Compose(transform_list)
 
 def is_image_file(filename):

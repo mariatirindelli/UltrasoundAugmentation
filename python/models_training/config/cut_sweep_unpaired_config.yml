@@ -1,0 +1,19 @@
+module : cut_image_generation.CUTImageGeneration
+dataset : BonePixelwiseDb.FolderSplit
+db_kind: 'unpaired_sweep'
+model : CycleGan.CycleGan
+data_root : datasets/CUT_SweepUnpaired
+output_path : ./results
+num_workers : 4
+batch_size : 1
+log_every_n_steps : 10
+learning_rate : 0.0002
+min_epochs : 1
+max_epochs : 200
+input_nc : 3
+output_nc: 3
+gpus : 0
+load_size: 512
+crop_size: 512
+group_name: 'US2CT_sweep'
+project_name: 'test_project'

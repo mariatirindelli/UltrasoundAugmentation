@@ -116,8 +116,6 @@ def get_split_paths(data_root):
     sub_ids = get_subject_ids_from_data(data_list)
     train_ids, val_ids, test_ids = get_subject_based_random_split(sub_ids)
 
-    print(train_ids, " ", val_ids, " ", test_ids)
-
     train_data = get_split_subjects_data(data_list, train_ids)
     val_data = get_split_subjects_data(data_list, val_ids)
     test_data = get_split_subjects_data(data_list, test_ids)

@@ -1,10 +1,13 @@
-import plotly.graph_objs as go
 import numpy as np
 import SimpleITK as sitk
 from scipy.spatial.transform import Rotation as R
-import os
+import matplotlib.pyplot as plt
 from random import sample
 import argparse
+from pre_post_processing_scripts.fix_pythonpath import *
+import imfusion
+import cv2
+
 
 def fit_plane(points):
     assert points.shape[1] == 3
@@ -104,13 +107,19 @@ def get_crop_roi(label_mask, centroid, us_bmode_size=(512, 512)):
     in_0 = centroid[0] - us_bmode_size[0] // 2
     end_0 = in_0 + us_bmode_size[0]
 
-    end_1 = centroid[1] - 5
+    end_1 = centroid[1]
     in_1 = end_1 - us_bmode_size[1]
 
     cropped_label = label_mask[in_0:end_0, in_1:end_1, :]
 
     reduced_label = np.sum(np.sum(cropped_label, axis=0, keepdims=True), axis=1)
     reduced_label = np.squeeze(reduced_label)
+
+    if len(np.argwhere(reduced_label != 0)) == 0:
+        print("Invalid roi")
+        print(np.argwhere(reduced_label != 0))
+        return [np.nan, np.nan], [np.nan, np.nan], [np.nan, np.nan]
+
     in_2 = np.argwhere(reduced_label != 0)[0][0]
     end_2 = np.argwhere(reduced_label != 0)[-1][0]
 
@@ -145,17 +154,31 @@ def resample_2_us(sitk_image, us_spacing):
 
     return resampled_image
 
+def imf_loading_and_preproc(data_path, binary=False):
 
-def process_volume(vol_path, label_path, skin_mask_path, random_centroid, us_bmode_size=(512, 512),
+    imf_data = imfusion.open(data_path)
+    properties_transformation = imfusion.Properties({'nearestInterpolation': 0,
+                                                     'adjustSize': 1,
+                                                     'samplerWrapping': 0})
+    result = imfusion.executeAlgorithm('Apply Transformation', imf_data, properties_transformation)[0]
+
+    spacing = result[0].spacing
+    result_array = np.squeeze(np.array(result))
+
+    if binary:
+        result_array[result_array > 0] = 255
+
+    sitk_image = sitk.GetImageFromArray(result_array)
+    sitk_image.SetSpacing(spacing)
+    return sitk_image
+
+def process_volume(sitk_vol, sitk_label, sitk_skin_mask, random_centroid, us_bmode_size=(512, 512),
                    us_spacing=(0.14, 0.14, 1), roi_tolerance=10):
     """
     The random centroid is given in python coordinate - axis = [0, 1, 2]
 
     """
-    sitk_vol = sitk.ReadImage(vol_path)
-    sitk_label = sitk.ReadImage(label_path)
 
-    sitk_skin_mask = sitk.ReadImage(skin_mask_path)
     skin_mask = sitk.GetArrayFromImage(sitk_skin_mask)
 
     # 1. Keeping the skin mask only around the centroid as we want the "local plane"
@@ -198,9 +221,14 @@ def process_volume(vol_path, label_path, skin_mask_path, random_centroid, us_bmo
                                    int(center_y * img_spacing[2] / us_spacing[2]), \
                                    int(center_z * img_spacing[0] / us_spacing[0])
 
+    show_centroid(rotated_volume_array, [center_0, center_1, center_2])
+
     [in_0, end_0], [in_1, end_1], [in_2, end_2] = get_crop_roi(label_mask=rotated_label_array,
                                                                centroid=[center_0, center_1, center_2],
                                                                us_bmode_size=us_bmode_size)
+
+    if np.isnan(in_0):
+        return None, None, None
 
     cropped_volume = rotated_volume_array[in_0:end_0, in_1:end_1, in_2:end_2]
     cropped_label = rotated_label_array[in_0:end_0, in_1:end_1, in_2:end_2]
@@ -225,66 +253,90 @@ def get_random_centroid(skin_mask):
 
     return [int(centroid_0), int(centroid_1), int(centroid_2)]
 
+def show_centroid(image, centroid):
+
+    image = image[:, :, centroid[-1]]
+    image_cpy = image.copy()
+    image_cpy = image_cpy - np.min(image_cpy)
+    image_cpy = image_cpy / np.max(image_cpy) * 255
+    image_cpy = image_cpy.astype(np.uint8)
+
+    img_rgb = cv2.cvtColor(image_cpy, cv2.COLOR_GRAY2RGB)
+
+    radius = int(0.05 * min(image_cpy.shape))
+    thickness = int(0.005 * max(image_cpy.shape))
+
+    print(centroid[0], "  ", centroid[1])
+
+    cv2.circle(img=img_rgb, center=(centroid[1], centroid[0]), radius=radius, color=(255, 0, 0), thickness=thickness)
+
+    plt.imshow(img_rgb)
+    plt.show()
+
 def main(params):
 
     volume_list = os.listdir(params.data_root)
     volume_list = [item for item in volume_list if "label" not in item and "skin" not in item]
-
-    for volume_name in volume_list:
-        subject_id = volume_name.replace(".imf", "")
-        for i in range(params.iter_x_volume):
-            sweep_id = i
-
-            skin_mask_name = volume_name.replace(".mhd", "-skin.imf")
-            label_name = volume_name.replace(".mhd", "-labels.imf")
-
-            sitk_skin_mask = sitk.ReadImage(os.path.join(params.data_root, skin_mask_name))
-            skin_mask = sitk.GetArrayFromImage(sitk_skin_mask)
-
-            random_centroid = get_random_centroid(skin_mask)
-
-            cropped_volume, cropped_label, spacing = process_volume(
-                vol_path="test_file\\volume.mhd",
-                label_path=os.path.join(params.data_root, label_name),
-                skin_mask_path=os.path.join(params.data_root, skin_mask_name),
-                random_centroid=random_centroid,
-                us_bmode_size=(80, 80))
-
-            cropped_volume_itk = sitk.GetImageFromArray(cropped_volume)
-            cropped_label_itk = sitk.GetImageFromArray(cropped_label)
-
-            cropped_volume_itk.SetSpacing(spacing)
-            cropped_label_itk.SetSpacing(spacing)
-
-            sitk.WriteImage(cropped_volume_itk, os.path.join(params.save_dir, subject_id + "_" + sweep_id + ".mhd"))
-            sitk.WriteImage(cropped_label_itk, os.path.join(params.save_dir, subject_id + "_" + sweep_id + "_label.mhd"))
-
-
     # sitk_skin_mask = sitk.ReadImage("test_file\\skin_label.mhd")
     # skin_mask = sitk.GetArrayFromImage(sitk_skin_mask)
-    #
-    # random_centroid = get_random_centroid(skin_mask)
-    # cropped_volume, cropped_label = process_volume(vol_path="test_file\\volume.mhd",
-    #                                                label_path="test_file\\label.mhd",
-    #                                                skin_mask_path="test_file\\skin_label.mhd",
-    #                                                random_centroid=random_centroid,
-    #                                                us_bmode_size=(512, 512))
-    #
-    # sitk.WriteImage(sitk.GetImageFromArray(cropped_volume), "cropped_volume.mhd")
-    # sitk.WriteImage(sitk.GetImageFromArray(cropped_label), "cropped_label.mhd")
 
-    #sitk_image = sitk.ReadImage("tmp_real.mhd")
-    #
-    # point_cloud2 = get_scatter_plot(point_cloud)
-    #
-    # vector_system = get_axis_plot(centroid, centroid+normal*50)
-    # x_axis = get_axis_plot([0, 0, 0], [rotated_array.shape[0], 0, 0])
-    # y_axis = get_axis_plot([0, 0, 0], [0, rotated_array.shape[1], 0])
-    # z_axis = get_axis_plot([0, 0, 0], [0, 0, rotated_array.shape[2]])
-    #
-    # # data2 = [vold_data_rot, vector_system]
-    # data2 = [point_cloud1, point_cloud2, vector_system, x_axis, y_axis, z_axis]
-    # fig2 = go.Figure(data=data2)
+    for volume_name in volume_list:
+
+        if "0" in volume_name or "2" in volume_name:
+            continue
+
+        print("Loading: ", volume_name)
+
+        try:
+
+            subject_id = volume_name.replace(".imf", "")
+
+            skin_mask_name = volume_name.replace(".imf", "-skin.imf")
+            label_name = volume_name.replace(".imf", "-labels.imf")
+
+            if not os.path.exists(os.path.join(params.data_root, skin_mask_name)) \
+                    or not os.path.exists(os.path.join(params.data_root, label_name)):
+                continue
+
+            sitk_skin_mask = imf_loading_and_preproc(data_path=os.path.join(params.data_root, skin_mask_name), binary=True)
+            skin_mask = sitk.GetArrayFromImage(sitk_skin_mask)
+
+            sitk_vol = imf_loading_and_preproc(data_path=os.path.join(params.data_root, volume_name))
+            sitk_label = imf_loading_and_preproc(data_path=os.path.join(params.data_root, label_name), binary=True)
+
+            i = 0
+            while i < params.iter_x_volume:
+                sweep_id = str(i)
+                random_centroid = get_random_centroid(skin_mask)
+
+                show_centroid(skin_mask, random_centroid)
+
+                cropped_volume, cropped_label, spacing = process_volume(
+                    sitk_vol=sitk_vol,
+                    sitk_label=sitk_label,
+                    sitk_skin_mask=sitk_skin_mask,
+                    random_centroid=random_centroid,
+                    us_bmode_size=(512, 512))
+
+                if cropped_label is None:
+                    print("skipping vol")
+                    continue
+
+                cropped_label[cropped_label>0] = 255
+
+                cropped_volume_itk = sitk.GetImageFromArray(cropped_volume)
+                cropped_label_itk = sitk.GetImageFromArray(cropped_label)
+
+                cropped_volume_itk.SetSpacing(spacing)
+                cropped_label_itk.SetSpacing(spacing)
+
+                sitk.WriteImage(cropped_volume_itk, os.path.join(params.save_dir, subject_id + "_" + sweep_id + ".mhd"))
+                sitk.WriteImage(cropped_label_itk, os.path.join(params.save_dir, subject_id + "_" + sweep_id + "_label.mhd"))
+
+                print("updating i")
+                i += 1
+        except:
+            print("ops.. something went wrong")
 
 
 if __name__ == '__main__':
@@ -301,6 +353,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_dir', type=str)
     parser.add_argument('--iter_x_volume', type=int)
     args = parser.parse_args()
+    imfusion.init()
 
     main(args)
 

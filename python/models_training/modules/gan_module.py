@@ -68,11 +68,6 @@ class GanModule(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx):
 
-        # use only the first dataset here
-        if isinstance(batch, dict):
-            keys = [item for item in batch.keys()]
-            batch = batch[keys[0]]
-
         real_images = batch['Image']  # are the US for dataloader_idx = 0, the CT otherwise
         conditions = batch['Label']
 

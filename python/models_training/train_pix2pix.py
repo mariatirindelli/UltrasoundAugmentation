@@ -14,9 +14,9 @@ import torch.multiprocessing
 torch.multiprocessing.set_sharing_strategy('file_system')
 import os
 from polyaxon_client.tracking import Experiment
-from datasets.torch_us_datasets import USBonesPaired
+from modules.cut_module import CUT2D
 
-def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
+def train_pix2pix(hparams, ModuleClass, ModelClass, DataModuleClass, DatasetClass, logger):
     """
     Main training routine specific for this project
     :param hparams:
@@ -25,9 +25,13 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
     # 1 INIT LIGHTNING MODEL
     # ------------------------
     # load model
-    model = ModelClass(hparams=hparams)
-    dataset = DatasetClass(hparams=hparams)
-    module = ModuleClass(hparams, model, logger=logger)
+    if ModelClass is None:
+        model = None
+    else:
+        model = ModelClass(hparams=hparams)
+
+    dataset = DataModuleClass(hparams=hparams, dataset=DatasetClass)
+    module = ModuleClass(hparams=hparams, model=model, logger=logger)
 
     # ------------------------
     # 3 INIT TRAINER --> continues training
@@ -55,15 +59,20 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
         log_every_n_steps=hparams.log_every_n_steps,
         auto_lr_find=True,
         auto_scale_batch_size=True,
-        # limit_train_batches=0.1,  # use 0.2 for Polyaxon, use 0.03 to avoid memory error on Anna's computer
-        # limit_val_batches=0.1,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
+        #limit_train_batches=0.01,  # use 0.2 for Polyaxon, use 0.03 to avoid memory error on Anna's computer
+        #limit_val_batches=0.01,  # use 0.4 for Polyaxon, use 0.05 to avoid memory error on Anna's computer
     )
     # ------------------------
     # 4 START TRAINING
     # ------------------------
 
+    dataset.prepare_data()
+
+    if isinstance(module, CUT2D):
+        module.data_dependent_initialize(next(iter(dataset.train_dataloader())))
+
     if not hparams.test_only:
-        dataset.prepare_data()
+
         trainer.fit(module, train_dataloader=dataset.train_dataloader(), val_dataloaders=dataset.val_dataloader())
 
         if len(dataset.test_dataloader()) == 0:
@@ -77,18 +86,14 @@ def train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger):
             f"\nTesting..."
         )
         # For the pix2pix network  we process the training data with the GAN as it "belongs" to the training process
-
         print("resuming checkpoint from: {}".format(hparams.resume_from_checkpoint))
         dataset.prepare_data()
-        test_loader = dataset.test_dataloader()
 
-        print("Files in test - {}: {}".format(hparams.data_root, len(os.listdir(hparams.data_root))))
-
-        if len(test_loader) == 0:
+        if len(dataset.test_dataloader()) == 0:
             print("No test data available")
             return
 
-        trainer.test(ckpt_path=hparams.resume_from_checkpoint, model=module, test_dataloaders=test_loader)
+        trainer.test(ckpt_path=hparams.resume_from_checkpoint, model=module, test_dataloaders=dataset.test_dataloader())
 
     print("test done")
 
@@ -116,15 +121,25 @@ if __name__ == "__main__":
     # LOAD MODEL
     # ------------------------
     # TODO: for gans add generator and discriminator models
-    model_path = f"models.{hparams.model}"
-    ModelClass = get_class_by_path(model_path)
-    parser = ModelClass.add_model_specific_args(parser)
+
+    if hparams.model == "":
+        ModelClass = None
+    else:
+        model_path = f"models.{hparams.model}"
+        ModelClass = get_class_by_path(model_path)
+        parser = ModelClass.add_model_specific_args(parser)
+    # ------------------------
+    # LOAD DATAMODULE
+    # ------------------------
+    datamodule_path = f"datamodules.{hparams.datamodule}"
+    DataModuleClass = get_class_by_path(datamodule_path)
+    parser = DataModuleClass.add_dataset_specific_args(parser)
     # ------------------------
     # LOAD DATASET
     # ------------------------
     dataset_path = f"datasets.{hparams.dataset}"
     DatasetClass = get_class_by_path(dataset_path)
-    parser = DatasetClass.add_dataset_specific_args(parser)
+
     # ------------------------
     #  PRINT PARAMS & INIT LOGGER
     # ------------------------
@@ -154,11 +169,10 @@ if __name__ == "__main__":
             os.mkdir(hparams.output_path)
 
     argparse_summary(hparams, parser)
-    # loggers = [tb_logger, plx_logger, wb_logger] if hparams.on_polyaxon else [tb_logger, wb_logger]
     logger = CustomWandbLogger(hparams)
 
     # ---------------------
     # RUN TRAINING
     # ---------------------
 
-    train_pix2pix(hparams, ModuleClass, ModelClass, DatasetClass, logger)
+    train_pix2pix(hparams, ModuleClass, ModelClass, DataModuleClass, DatasetClass, logger)

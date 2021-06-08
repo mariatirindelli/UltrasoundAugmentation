@@ -18,6 +18,13 @@ class Visualizer:
         # image = int(image + 1 / 2.0 * 255.0)
         return image
 
+    @staticmethod
+    def flat_channel_as_images(image_list):
+        modified_image_list = []
+        for item in image_list:
+            modified_image_list.extend(np.dsplit(item, item.shape[0]))
+        return modified_image_list
+
     def update_image_queue(self, image_dict, epoch):
         assert isinstance(image_dict, dict), "image dict must be a dictionary"
 
@@ -30,8 +37,11 @@ class Visualizer:
         for key in image_dict.keys():
 
             images_list = tensor2np_array(image_dict[key])
-            if len(images_list[0].shape) == 3:
+            if len(images_list[0].shape) > 2 and images_list[0].shape[0] == 3:
                 images_list = [self.reshape_rgb_images(item) for item in images_list]
+
+            if len(images_list[0].shape) > 2 and images_list[0].shape[0] != 1 and images_list[0].shape[0] != 3:
+                images_list = self.flat_channel_as_images(images_list)
 
             if key not in self.image_queue.keys():
                 self.image_queue[key] = images_list

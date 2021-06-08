@@ -1,172 +1,20 @@
 import unittest
-import argparse
-import datasets.PairedPixelwiseDb as dt
+from test_utils import create_parser, get_params_dict, val_type_dict, TestDbClass
 import os
-import numpy as np
 import datasets.dataset_utils as dt_utils
 
-class MyTestCase(unittest.TestCase):
-
-
-    @staticmethod
-    def are_list_equal(list1, list2):
-        for item in list1:
-            if item not in list2:
-                return False
-
-        for item in list2:
-            if item not in list1:
-                return False
-
-        return True
-
-    def _get_expected_file_lists(self, root_folder):
-        expected_train_db = os.listdir(os.path.join(self.root, 'folder_db', 'train'))
-        expected_train_db = [os.path.join(root_folder, item) for item in expected_train_db if "label" not in item]
-
-        expected_val_db = os.listdir(os.path.join(self.root, 'folder_db', 'val'))
-        expected_val_db = [os.path.join(root_folder, item) for item in expected_val_db if "label" not in item]
-
-        expected_test_db = os.listdir(os.path.join(self.root, 'folder_db', 'test'))
-        expected_test_db = [os.path.join(root_folder, item) for item in expected_test_db if "label" not in item]
-
-        return expected_train_db, expected_val_db, expected_test_db
+# todo fix this
+class MyTestCase(TestDbClass):
 
     def setUp(self):
-        self.parser = self._create_parser()
         test_filepath = os.path.abspath(__file__)
         self.root = os.path.join(os.path.split(test_filepath)[0], "test_data")
-
-    def test_BoneDb_folder_split_train(self):
-        """
-        Testing BoneDb implementation with folder_db, train split
-        Returns:
-        """
-        self.setUp()
-
-        root_folder = os.path.join(self.root, 'folder_db')
-        split = 'test'
-        input_params = self.parser.parse_args(['--data_root', root_folder])
-
-        expected_output = os.listdir(os.path.join(root_folder, split))
-        expected_output = [os.path.join(root_folder, split, item) for item in expected_output if "label" not in item]
-
-        method = dt.USBonesPaired(hparams=input_params,
-                            split=split,
-                            data_structure='folder_based')
-
-        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
-
-    def test_BoneDb_folder_split_val(self):
-        """
-        Testing BoneDb implementation with folder_db, train split
-        Returns:
-        """
-        self.setUp()
-
-        root_folder = os.path.join(self.root, 'folder_db')
-        split = 'val'
-        input_params = self.parser.parse_args(['--data_root', root_folder])
-
-        expected_output = os.listdir(os.path.join(root_folder, split))
-        expected_output = [os.path.join(root_folder, split, item) for item in expected_output if "label" not in item]
-
-        method = dt.USBonesPaired(hparams=input_params,
-                                  split=split,
-                                  data_structure='folder_based')
-
-        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
-
-    def test_BoneDb_folder_split_test(self):
-        """
-        Testing BoneDb implementation with folder_db, train split
-        Returns:
-        """
-        self.setUp()
-
-        root_folder = os.path.join(self.root, 'folder_db')
-        split = 'test'
-        input_params = self.parser.parse_args(['--data_root', root_folder])
-
-        expected_output = os.listdir(os.path.join(root_folder, split))
-        expected_output = [os.path.join(root_folder, split, item) for item in expected_output if "label" not in item]
-
-        method = dt.USBonesPaired(hparams=input_params,
-                                  split=split,
-                                  data_structure='folder_based')
-
-        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
-
-    def test_BoneDb_subject_split_train(self):
-        """
-        Testing BoneDb implementation with folder_db, train split
-        Returns:
-        """
-        self.setUp()
-
-        root_folder = os.path.join(self.root, 'subject_db')
-        train_subject_ids = ["2", "4", "5", "6", "8", "9", "10", "12", "13", "15", "16", "18"]
-        split = 'train'
-        input_params = self.parser.parse_args(['--data_root', root_folder])
-
-        expected_output = os.listdir(os.path.join(self.root, 'folder_db', split))
-        expected_output = [os.path.join(root_folder, item) for item in expected_output if "label" not in item]
-
-        method = dt.USBonesPaired(hparams=input_params,
-                                  data_structure='subject_based',
-                                  subject_list=train_subject_ids)
-
-        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
-
-    def test_BoneDb_subject_split_val(self):
-        """
-        Testing BoneDb implementation with folder_db, train split
-        Returns:
-        """
-        self.setUp()
-
-        root_folder = os.path.join(self.root, 'subject_db')
-        val_subject_ids = ["14", "17", "11", "7"]
-        split = 'val'
-        input_params = self.parser.parse_args(['--data_root', root_folder])
-
-        expected_output = os.listdir(os.path.join(self.root, 'folder_db', split))
-        expected_output = [os.path.join(root_folder, item) for item in expected_output if "label" not in item]
-
-        method = dt.USBonesPaired(hparams=input_params,
-                                  data_structure='subject_based',
-                                  subject_list=val_subject_ids)
-
-        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
-
-    def test_BoneDb_subject_split_test(self):
-        """
-        Testing BoneDb implementation with folder_db, train split
-        Returns:
-        """
-        self.setUp()
-
-        root_folder = os.path.join(self.root, 'subject_db')
-        test_subject_ids = ["1", "3"]
-        split = 'test'
-        input_params = self.parser.parse_args(['--data_root', root_folder])
-
-        expected_output = os.listdir(os.path.join(self.root, 'folder_db', split))
-        expected_output = [os.path.join(root_folder, item) for item in expected_output if "label" not in item]
-
-        method = dt.USBonesPaired(hparams=input_params,
-                                  data_structure='subject_based',
-                                  subject_list=test_subject_ids)
-
-        self.assertTrue(self.are_list_equal(method.AB_paths, expected_output))
 
     def test_SubjectSplitdDb_allSetGiven(self):
         """
         Testing BoneDb implementation with folder_db, train split
         Returns:
         """
-        self.setUp()
-
         root_folder = os.path.join(self.root, 'subject_db')
 
         train_subject_ids = "2, 4, 5,6, 8, 9,  10, 12, 13, 15, 16, 18"

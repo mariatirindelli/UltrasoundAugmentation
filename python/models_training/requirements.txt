@@ -16,3 +16,4 @@ tqdm==4.51.0
 scikit-image
 python-math
 wandb
+geomstats

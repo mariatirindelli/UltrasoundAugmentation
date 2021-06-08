@@ -20,11 +20,12 @@ def build_configargparser(parser):
     module_group.add_argument('--module', type=str, required=True)
 
     # config model e.g. densenet.DenseNet121
-    model_group.add_argument('--model', type=str, required=True)
+    model_group.add_argument('--model', type=str, default="")
 
     # config dataset e.g. ham10k.HAM10k
     dataset_group.add_argument('--data_root', type=str, default='', required=True)
-    dataset_group.add_argument('--dataset', type=str, required=True) ## Nicht lightning
+    dataset_group.add_argument('--datamodule', type=str, required=True)
+    dataset_group.add_argument('--dataset', type=str, required=True)
     
     # config trainer
     trainer_group.add_argument('--train_percent_check', type=float, default=1.0)

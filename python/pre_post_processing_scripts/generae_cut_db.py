@@ -28,6 +28,11 @@ def main(params):
             dest_paths = [os.path.join(params.save_path, split + group_id, item) for item in split_dict[split]]
 
             for (src_path, dst_path) in zip(data_paths, dest_paths):
+
+                # todo this can be removed
+                if "label" in src_path:
+                    continue
+
                 shutil.copy(src=src_path,
                             dst=dst_path)
 

@@ -77,6 +77,11 @@ scp mariatirindelli@10.23.0.56:/mnt/data/mariatirindelli/output/Pix2Pix/myres.zi
 scp mariatirindelli@10.23.0.54:/home/mariatirindelli/model_traning/results/210513-142855_GanModule_MixedDb_pix2pix_Pix2PixModel/pix2pix_o.zip D:\NAS
 scp mariatirindelli@10.23.0.54:/home/mariatirindelli/model_traning/results/210513-143217_GanSemiUnpairedModule_MixedDb_pix2pix_Pix2PixModel/mixed_o.zip D:\NAS
 
+
+scp mariatirindelli@10.23.0.54:/home/mariatirindelli/cut_model/A.mhd E:\A.mhd
+
+scp C:\Users\maria\Downloads\CampDb.zip mariatirindelli@10.23.0.54:/home/mariatirindelli/model_training
+
 ## TO CREATE POLYAXON PROJECT
 ```
 polyaxon project create --name CIFAR10_Example
