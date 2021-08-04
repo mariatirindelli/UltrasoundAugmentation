@@ -37,3 +37,4 @@ python/models_training/wandb/
 *.html
 *.raw
 python/models_training/data/
+venv/
